@@ -40,7 +40,10 @@
 
   /* Historial (vista inicio) */
   #history { margin-top: 28px; }
-  #history h2 { font: 700 17px Georgia, serif; margin: 0 0 8px; }
+  #history h2 { font: 700 17px Georgia, serif; margin: 0; }
+  .h-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .obs-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font: 600 15px system-ui, sans-serif; text-underline-offset: 3px; }
+  .obs-link:hover { color: var(--ink); }
   #historyEmpty { color: var(--muted); font-size: 13px; margin: 0; }
   .h-item { display: flex; align-items: stretch; background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; min-width: 0; }
   .h-open { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; text-align: left; background: transparent; color: var(--ink); padding: 14px 16px; font: 15px/1.4 system-ui, sans-serif; }
@@ -150,7 +153,7 @@
       </div>
 
       <section id="history">
-        <h2>Historial</h2>
+        <div class="h-head"><h2>Historial</h2><a class="obs-link" href="ticker" target="_blank" rel="noopener" title="Abre el banner de titulares; copia su dirección en una Fuente de navegador de OBS">Banner para OBS ↗</a></div>
         <p id="historyEmpty" hidden>Todavía no hay pautas.</p>
         <div id="historyList"></div>
       </section>

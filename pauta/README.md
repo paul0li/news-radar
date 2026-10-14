@@ -66,6 +66,33 @@ so it needs no password:
 To expose it publicly instead, put a reverse proxy with HTTPS (nginx, Caddy) in front and set
 `APP_PASSWORD`, since every request spends your Claude usage.
 
+## OBS headline ticker
+
+`/ticker` is a page made for an OBS **Browser Source**: a transparent page with a bar that keeps
+scrolling the (rewritten) headlines of the most recent pauta, in running order. It polls every
+30 seconds; when a new pauta is created or reordered, the change is applied at the end of the
+current loop, so the bar never jumps.
+
+In OBS: *Sources → + → Browser*, URL `https://<your-host>/ticker`, width 1920, height 80 (or the
+bar's height). The machine running OBS must be able to reach the app (e.g. be on the same tailnet).
+
+Optional URL parameters:
+
+| Parameter | Default | |
+|---|---|---|
+| `velocidad` | `90` | Scroll speed in px per second. |
+| `tam` | `40` | Font size in px. |
+| `alto` | `tam × 1.8` | Bar height in px. |
+| `fondo` | `#0b0b0dd9` | Bar background (any CSS color) or `transparente`. |
+| `color` | `#ffffff` | Text color. |
+| `acento` | `#c2410c` | Label background. |
+| `etiqueta` | `Titulares` | Label text; empty (`etiqueta=`) hides it. |
+| `posicion` | `abajo` | `abajo` or `arriba`. |
+| `fuente` | `system-ui` | Font family. |
+
+Example: `/ticker?tam=48&velocidad=120&etiqueta=Hoy`. The data comes from `GET /api/ticker`
+(`{ id, createdAt, titulares: [{ texto, tono }] }`).
+
 ## Configuration
 
 | Variable | Default | Purpose |

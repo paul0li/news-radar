@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Titulares</title>
+<!--
+  Banner de titulares para OBS (Fuente de navegador). Muestra en loop los titulares de la pauta más
+  reciente y se actualiza solo. Parámetros opcionales en la URL:
+    velocidad  px por segundo (90)            tam       tamaño de letra en px (40)
+    alto       alto de la franja en px (tam × 1.8)
+    fondo      color de fondo (#0b0b0dd9) o "transparente"
+    color      color del texto (#ffffff)       acento    color de la etiqueta (#c2410c)
+    etiqueta   texto de la etiqueta (TITULARES); vacío para ocultarla
+    posicion   abajo | arriba (abajo)
+    fuente     familia tipográfica (system-ui)
+  Ej: /ticker?tam=48&velocidad=120&etiqueta=HOY
+-->
+<style>
+  :root { --tam: 40px; --alto: 72px; --fondo: #0b0b0dd9; --color: #fff; --acento: #c2410c; --fuente: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; height: var(--alto); display: flex; align-items: stretch; background: var(--fondo); color: var(--color); font: 700 var(--tam)/1 var(--fuente); }
+  .bar.arriba { top: 0; bottom: auto; }
+  .bar.vacia { visibility: hidden; }
+  .label { flex: none; display: flex; align-items: center; padding: 0 calc(var(--tam) * .6); background: var(--acento); color: #fff; font-size: calc(var(--tam) * .62); letter-spacing: .08em; text-transform: uppercase; }
+  .viewport { position: relative; flex: 1; overflow: hidden; display: flex; align-items: center; }
+  .track { display: flex; white-space: nowrap; will-change: transform; }
+  .seq { display: flex; align-items: center; flex: none; }
+  .item { display: inline-flex; align-items: center; padding-right: calc(var(--tam) * 1.4); }
+  .dot { width: calc(var(--tam) * .32); height: calc(var(--tam) * .32); border-radius: 50%; margin-right: calc(var(--tam) * .45); background: #a8a29e; flex: none; }
+  .gracioso .dot { background: #fbbf24; }
+  .serio .dot { background: #60a5fa; }
+</style>
+</head>
+<body>
+<div class="bar vacia" id="bar">
+  <div class="label" id="label"></div>
+  <div class="viewport"><div class="track" id="track"></div></div>
+</div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const num = (k, def, min, max) => { const n = Number(q.get(k)); return Number.isFinite(n) && n >= min && n <= max ? n : def; };
+  const VEL = num("velocidad", 90, 10, 1000);
+  const TAM = num("tam", 40, 10, 200);
+  const ALTO = num("alto", Math.round(TAM * 1.8), 10, 600);
+  const root = document.documentElement.style;
+  root.setProperty("--tam", `${TAM}px`);
+  root.setProperty("--alto", `${ALTO}px`);
+  const fondo = q.get("fondo");
+  if (fondo) root.setProperty("--fondo", /^transparen/i.test(fondo) ? "transparent" : fondo);
+  if (q.get("color")) root.setProperty("--color", q.get("color"));
+  if (q.get("acento")) root.setProperty("--acento", q.get("acento"));
+  if (q.get("fuente")) root.setProperty("--fuente", q.get("fuente"));
+  if (q.get("posicion") === "arriba") document.getElementById("bar").classList.add("arriba");
+  const etiqueta = q.has("etiqueta") ? q.get("etiqueta") : "Titulares";
+  const label = document.getElementById("label");
+  label.textContent = etiqueta;
+  label.hidden = !etiqueta;
+
+  const bar = document.getElementById("bar");
+  const track = document.getElementById("track");
+  let latestKey = "";  // últimos titulares recibidos
+  let pending = null;  // titulares nuevos, se aplican al terminar la vuelta
+  let anim = null;
+
+  function buildSeq(titulares) {
+    const seq = document.createElement("div");
+    seq.className = "seq";
+    for (const t of titulares) {
+      const item = document.createElement("span");
+      item.className = `item ${t.tono || "neutro"}`;
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      item.append(dot, document.createTextNode(t.texto));
+      seq.appendChild(item);
+    }
+    return seq;
+  }
+
+  // Arma la cinta: una secuencia que (repetida) cubre el ancho, y una copia para el loop sin corte.
+  function render(titulares) {
+    if (anim) anim.cancel();
+    track.replaceChildren();
+    bar.classList.toggle("vacia", titulares.length === 0);
+    if (titulares.length === 0) return;
+    const seq = buildSeq(titulares);
+    track.appendChild(seq);
+    const vw = track.parentElement.clientWidth;
+    while (seq.scrollWidth < vw) for (const n of [...buildSeq(titulares).children]) seq.appendChild(n);
+    track.appendChild(seq.cloneNode(true));
+    const w = seq.scrollWidth;
+    anim = track.animate([{ transform: "translateX(0)" }, { transform: `translateX(-${w}px)` }], { duration: (w / VEL) * 1000, easing: "linear" });
+    anim.onfinish = () => {
+      if (pending) { const p = pending; pending = null; render(p); } else anim.play();
+    };
+  }
+
+  async function poll() {
+    try {
+      const r = await fetch("api/ticker", { cache: "no-store" });
+      if (!r.ok) return;
+      const { titulares = [] } = await r.json();
+      const key = JSON.stringify(titulares);
+      if (key === latestKey) return;
+      latestKey = key;
+      if (!anim || titulares.length === 0) render(titulares); else pending = titulares;
+    } catch {
+      // Sin conexión: se sigue mostrando lo último que llegó.
+    }
+  }
+
+  poll();
+  setInterval(poll, 30_000);
+  // Si cambia el tamaño de la fuente en OBS, se rearma la cinta.
+  let rz;
+  addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => latestKey && render(JSON.parse(latestKey)), 300); });
+</script>
+</body>
+</html>

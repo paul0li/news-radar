@@ -163,19 +163,44 @@ async function readBody(req) {
 }
 
 const indexHtml = await readFile(new URL("./public/index.html", import.meta.url), "utf8");
+const tickerHtml = await readFile(new URL("./public/ticker.html", import.meta.url), "utf8");
+
+// Titulares de la pauta más reciente, para el banner de OBS.
+async function titularesActuales() {
+  const [ultima] = await listPautas({ limit: 1 });
+  if (!ultima) return { id: null, createdAt: null, titulares: [] };
+  const p = await getPauta(ultima.id);
+  return {
+    id: p.id,
+    createdAt: p.createdAt,
+    titulares: p.items.map((it) => ({ texto: it.titulo || it.title, tono: it.tono })),
+  };
+}
 
 const server = http.createServer(async (req, res) => {
-  if (req.url === "/healthz") return send(res, 200, "ok", "text/plain");
+  const path = req.url.split("?")[0];
+  if (path === "/healthz") return send(res, 200, "ok", "text/plain");
   if (!authorized(req)) {
     res.writeHead(401, { "www-authenticate": 'Basic realm="pauta"' });
     return res.end();
   }
 
-  if (req.method === "GET" && (req.url === "/" || req.url === "/index.html")) {
+  if (req.method === "GET" && (path === "/" || path === "/index.html")) {
     return send(res, 200, indexHtml, "text/html; charset=utf-8");
   }
 
-  if (req.method === "POST" && req.url === "/api/ordenar") {
+  // Banner para OBS (fuente de navegador) y sus datos.
+  if (req.method === "GET" && path === "/ticker") return send(res, 200, tickerHtml, "text/html; charset=utf-8");
+  if (req.method === "GET" && path === "/api/ticker") {
+    try {
+      return send(res, 200, await titularesActuales());
+    } catch (err) {
+      console.error(err);
+      return send(res, 500, { error: "Error inesperado." });
+    }
+  }
+
+  if (req.method === "POST" && path === "/api/ordenar") {
     try {
       const { texto = "", criterio = "" } = await readBody(req);
       const items = parseLinks(String(texto));
@@ -193,7 +218,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Historial: /api/pautas y /api/pautas/:id
-  const path = req.url.split("?")[0];
   const m = path.match(/^\/api\/pautas(?:\/([^/]+))?$/);
   if (m) {
     const id = m[1]; // el store valida el formato (sin path traversal)
