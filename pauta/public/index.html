@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pauta editorial</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
+<style>
+  :root {
+    --bg: #f6f3ec; --card: #fffdf8; --ink: #1d1b16; --muted: #6d675b; --line: #ddd5c4;
+    --accent: #c2410c; --fun: #d97706; --fun-bg: #fef3c7; --serious: #1e40af; --serious-bg: #dbeafe;
+    --neutral: #57534e; --neutral-bg: #eeebe5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16140f; --card: #1f1c16; --ink: #f1ece2; --muted: #a39b8b; --line: #3a352b;
+      --accent: #fb923c; --fun: #fbbf24; --fun-bg: #3b2a08; --serious: #93c5fd; --serious-bg: #172554;
+      --neutral: #d6d3d1; --neutral-bg: #2c2924;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  header h1 { font: 800 30px/1.1 Georgia, "Times New Roman", serif; margin: 0; letter-spacing: -0.5px; }
+  header p { margin: 4px 0 20px; color: var(--muted); }
+  textarea, input { width: 100%; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: inherit; }
+  textarea { min-height: 220px; resize: vertical; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+  label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: 13px; }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; font: 600 15px system-ui, sans-serif; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  button:disabled { opacity: .6; cursor: wait; }
+  #status { color: var(--muted); font-size: 13px; }
+  #status.err { color: #dc2626; }
+  #result { margin-top: 28px; }
+  #result h2 { font: 700 20px Georgia, serif; margin: 0 0 4px; }
+  .rhythm { display: flex; gap: 2px; margin: 8px 0 14px; }
+  .rhythm span { flex: 1; height: 8px; border-radius: 2px; }
+  ol { list-style: none; padding: 0; margin: 0; }
+  li { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: start; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--neutral); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  li.gracioso { border-left-color: var(--fun); }
+  li.serio { border-left-color: var(--serious); }
+  li.done { opacity: .45; }
+  .n { font: 700 18px Georgia, serif; color: var(--muted); text-align: right; }
+  .t a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+  .t a:hover { text-decoration: underline; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+  .tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 99px; white-space: nowrap; background: var(--neutral-bg); color: var(--neutral); }
+  .gracioso .tag { background: var(--fun-bg); color: var(--fun); }
+  .serio .tag { background: var(--serious-bg); color: var(--serious); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>📡 Pauta editorial</h1>
+    <p>Pega la pauta del día. Claude la ordena intercalando risas y noticias duras para que nadie se vaya de la transmisión.</p>
+  </header>
+
+  <label for="texto">Links de hoy (título + link, en cualquier formato)</label>
+  <textarea id="texto" placeholder="Perro se roba un pollo en pleno noticiero&#10;https://www.tiktok.com/@...&#10;&#10;Banco Central sube la tasa de interés https://www.latercera.com/..."></textarea>
+
+  <label for="criterio">Indicación extra (opcional)</label>
+  <input id="criterio" maxlength="500" placeholder="Ej: abrir con lo del Congreso; dejar el video del gato para el cierre">
+
+  <div class="row">
+    <button id="go">Armar pauta</button>
+    <span id="status"></span>
+  </div>
+
+  <section id="result" hidden>
+    <h2>Orden sugerido</h2>
+    <div class="rhythm" id="rhythm" title="Ritmo de la pauta"></div>
+    <ol id="list"></ol>
+    <div class="row">
+      <button class="ghost" id="copy">Copiar lista</button>
+      <button class="ghost" id="openNext">Abrir siguiente ↗</button>
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const colors = { gracioso: "var(--fun)", serio: "var(--serious)", neutro: "var(--neutral)" };
+  let items = [];
+
+  try { $("texto").value = localStorage.getItem("pauta:texto") || ""; } catch {}
+  $("texto").addEventListener("input", () => { try { localStorage.setItem("pauta:texto", $("texto").value); } catch {} });
+
+  function status(msg, err = false) { $("status").textContent = msg; $("status").className = err ? "err" : ""; }
+
+  function render() {
+    $("list").innerHTML = "";
+    $("rhythm").innerHTML = "";
+    items.forEach((it, i) => {
+      const li = document.createElement("li");
+      li.className = it.tono + (it.done ? " done" : "");
+      li.innerHTML = `<div class="n">${i + 1}</div><div class="t"><a target="_blank" rel="noopener noreferrer"></a><div class="meta"></div></div><span class="tag"></span>`;
+      const a = li.querySelector("a");
+      a.href = it.url;
+      a.textContent = it.title;
+      a.addEventListener("click", () => { it.done = true; li.classList.add("done"); });
+      li.querySelector(".meta").textContent = `${it.domain} · ${it.motivo}`;
+      li.querySelector(".tag").textContent = it.tono;
+      $("list").appendChild(li);
+      const bar = document.createElement("span");
+      bar.style.background = colors[it.tono];
+      $("rhythm").appendChild(bar);
+    });
+    $("result").hidden = items.length === 0;
+  }
+
+  $("go").addEventListener("click", async () => {
+    const texto = $("texto").value.trim();
+    if (!texto) return status("Pega la lista primero.", true);
+    $("go").disabled = true;
+    status("Armando la pauta…");
+    const t0 = Date.now();
+    try {
+      const r = await fetch("api/ordenar", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ texto, criterio: $("criterio").value.trim() }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
+      items = data.items;
+      render();
+      status(`${items.length} links ordenados en ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    } catch (e) {
+      status(e.message, true);
+    } finally {
+      $("go").disabled = false;
+    }
+  });
+
+  $("copy").addEventListener("click", async () => {
+    const txt = items.map((it, i) => `${i + 1}. ${it.title}\n${it.url}`).join("\n\n");
+    try { await navigator.clipboard.writeText(txt); status("Lista copiada."); } catch { status("No pude copiar.", true); }
+  });
+
+  $("openNext").addEventListener("click", () => {
+    const it = items.find((x) => !x.done);
+    if (!it) return status("Ya abriste todos.");
+    window.open(it.url, "_blank", "noopener");
+    it.done = true;
+    render();
+  });
+</script>
+</body>
+</html>
