@@ -30,7 +30,18 @@ Reglas:
 - Agrupa temas relacionados solo si se potencian; evita repetir el mismo tema seguido.
 - No cuentes chistes sobre tragedias: si hay una muerte o desgracia, no pongas inmediatamente antes algo burlón del mismo tema.
 - Solo puedes usar los ids entregados. Incluye cada id exactamente una vez.
-- "motivo": una frase muy corta (máx. 12 palabras) de por qué va en esa posición.`;
+- "motivo": una frase muy corta (máx. 12 palabras) de por qué va en esa posición.
+- "titulo": reescribe SIEMPRE el título para leerlo en pantalla durante la transmisión. Los originales los escribió el editor a la rápida (con faltas, abreviaciones o sin contexto); no los copies tal cual.
+  - Que den ganas de verlo: con gancho y ritmo, en español de Chile natural, claro y breve (máx. ~90 caracteres). Corrige ortografía y mayúsculas.
+  - Fiel al original: no inventes datos, cifras, nombres ni detalles que no estén en el título original. Mantén los nombres propios.
+  - Ajusta el tono a la noticia: con humor e ingenio si es gracioso; sobrio, claro y respetuoso si es serio (nunca bromas sobre muertes, tragedias o víctimas).
+  - Sin clickbait engañoso, sin MAYÚSCULAS sostenidas y sin emojis.
+  - Si el original es solo un dominio o una URL, escribe un título neutro y breve basado en eso, sin inventar el contenido.
+  - Ejemplos:
+    "perro roba pollo noticiero vivo" → "El perro que se robó el show (y un pollo) en pleno noticiero"
+    "gato abre refri" → "Este gato aprendió a abrir el refri y ya nada está a salvo"
+    "bc sube tasa 6%" → "El Banco Central sube la tasa de interés a 6%"
+    "temblor antofa 2 muertos" → "Temblor en Antofagasta deja dos fallecidos"`;
 
 const SCHEMA = {
   type: "object",
@@ -43,8 +54,9 @@ const SCHEMA = {
           id: { type: "integer" },
           tono: { type: "string", enum: ["gracioso", "serio", "neutro"] },
           motivo: { type: "string" },
+          titulo: { type: "string" },
         },
-        required: ["id", "tono", "motivo"],
+        required: ["id", "tono", "motivo", "titulo"],
         additionalProperties: false,
       },
     },
@@ -112,10 +124,11 @@ function reconciliar(items, orden) {
     const it = byId.get(o.id);
     if (!it || seen.has(o.id)) continue;
     seen.add(o.id);
-    out.push({ ...it, tono: o.tono, motivo: o.motivo });
+    const titulo = typeof o.titulo === "string" ? o.titulo.trim().slice(0, 200) : "";
+    out.push({ ...it, tono: o.tono, motivo: o.motivo, titulo: titulo || it.title });
   }
   for (const it of items) {
-    if (!seen.has(it.id)) out.push({ ...it, tono: "neutro", motivo: "(el modelo lo omitió)" });
+    if (!seen.has(it.id)) out.push({ ...it, tono: "neutro", motivo: "(el modelo lo omitió)", titulo: it.title });
   }
   return out;
 }

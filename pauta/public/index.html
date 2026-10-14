@@ -180,7 +180,7 @@
       <button class="ghost" id="reset">Reiniciar</button>
       <span id="pStatus" class="status" role="status"></span>
     </div>
-    <div class="p-sub"><span class="hint" id="dragHint" hidden>Arrastra ⋮⋮ para mover</span><span></span><button class="linkish" id="toggleDone" hidden></button></div>
+    <div class="p-sub"><span class="hint" id="dragHint" hidden>Arrastra ⋮⋮ para mover</span><span></span></div>
     <ol id="list" class="plist"></ol>
     <div class="p-end" id="pEnd" hidden>
       <p class="p-end-t">¡Pauta terminada! 🎉</p>
@@ -294,8 +294,8 @@
   }
 
   // ¿Mostrar los links ya vistos (atenuados)? Por defecto se ocultan.
-  let showDone = false;
-  try { showDone = localStorage.getItem("pauta:mostrarVistos") === "1"; } catch {}
+  // Los links abiertos se quedan en la lista, oscurecidos (no se ocultan).
+  const showDone = true;
 
   // Guarda en el servidor los cambios de la pauta (qué links ya se abrieron y/o el orden).
   // Los envíos de una misma pauta van uno tras otro: si hay cambios mientras uno está en vuelo,
@@ -367,8 +367,6 @@
     $("pCrit").querySelector("span").textContent = current.criterio || "";
     $("openNext").disabled = next === -1;
     $("reset").disabled = d === 0;
-    $("toggleDone").hidden = d === 0;
-    $("toggleDone").textContent = showDone ? "Ocultar vistos" : `Mostrar vistos (${d})`;
     $("pEnd").hidden = !(n > 0 && next === -1);
   }
 
@@ -397,7 +395,9 @@
       li.querySelector(".n").textContent = i + 1;
       const a = li.querySelector("a");
       a.href = it.url;
-      a.textContent = it.title || it.url;
+      a.textContent = it.titulo || it.title || it.url;
+      // El título original queda como tooltip, por si la reescritura confunde.
+      if (it.titulo && it.titulo !== it.title) a.title = `Original: ${it.title}`;
       // No hacer preventDefault: el navegador abre la pestaña y después escondemos el link.
       const opened = () => { if (markDone(it)) hideItem(li); };
       a.addEventListener("click", opened);
@@ -635,7 +635,7 @@
   }
 
   $("copy").addEventListener("click", async () => {
-    const txt = items.map((it, i) => `${i + 1}. ${it.title}\n${it.url}`).join("\n\n");
+    const txt = items.map((it, i) => `${i + 1}. ${it.titulo || it.title}\n${it.url}`).join("\n\n");
     try { await navigator.clipboard.writeText(txt); status("Lista copiada."); } catch { status("No pude copiar.", true); }
   });
 
@@ -647,12 +647,6 @@
     hideItem($("list").querySelector(`li[data-id="${it.id}"]`));
   });
 
-  $("toggleDone").addEventListener("click", () => {
-    showDone = !showDone;
-    try { localStorage.setItem("pauta:mostrarVistos", showDone ? "1" : "0"); } catch {}
-    renderHeader();
-    renderList();
-  });
 
   function resetPauta() {
     if (!current || doneCount() === 0) return;

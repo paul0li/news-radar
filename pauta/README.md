@@ -93,7 +93,7 @@ All endpoints use the same auth as the page.
 | `PUT /api/pautas/:id` | `{ order?, done? }` | `{ pauta }`. `order` must be a permutation of all item ids; `done` is the full list of opened item ids. |
 | `DELETE /api/pautas/:id` | | `{ ok: true }` |
 
-A pauta is `{ id, createdAt, updatedAt, criterio, items: [{ id, title, url, domain, tono, motivo, done }] }`;
+A pauta is `{ id, createdAt, updatedAt, criterio, items: [{ id, title, titulo, url, domain, tono, motivo, done }] }`;
 the order of `items` is the running order. Invalid input returns `400`, unknown ids `404`, both as `{ error }`.
 
 ## Tuning the editorial rules

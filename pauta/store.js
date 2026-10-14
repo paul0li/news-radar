@@ -52,7 +52,7 @@ export async function createPauta({ criterio = "", items }) {
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
     criterio,
-    items: items.map(({ id, title, url, domain, tono, motivo }) => ({ id, title, url, domain, tono, motivo, done: false })),
+    items: items.map(({ id, title, titulo, url, domain, tono, motivo }) => ({ id, title, titulo: titulo || title, url, domain, tono, motivo, done: false })),
   };
   return save(pauta);
 }
@@ -91,7 +91,7 @@ export async function listPautas({ limit = 30 } = {}) {
         updatedAt: p.updatedAt,
         count: p.items.length,
         doneCount: p.items.filter((it) => it.done).length,
-        preview: p.items.slice(0, 3).map((it) => it.title),
+        preview: p.items.slice(0, 3).map((it) => it.titulo || it.title),
       });
     } catch (err) {
       if (err.status !== 404) console.warn(`No pude leer la pauta ${id}:`, err.message);
