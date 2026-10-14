@@ -4,13 +4,17 @@ import { readFile } from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import { parseLinks } from "./parse.js";
+import { createPauta, getPauta, listPautas, updatePauta, deletePauta } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
 const MODEL = process.env.MODEL || "opus";
 const EFFORT = process.env.EFFORT || "low";
-const CLAUDE_BIN = process.env.CLAUDE_BIN || "claude";
+// Rutas relativas (ej. ./test/fake-claude.js) se resuelven desde donde se lanzó el server,
+// porque claude corre con cwd temporal.
+const CLAUDE_BIN = /[\\/]/.test(process.env.CLAUDE_BIN || "") ? resolve(process.env.CLAUDE_BIN) : process.env.CLAUDE_BIN || "claude";
 const TIMEOUT_MS = 180_000;
 const APP_PASSWORD = process.env.APP_PASSWORD || "";
 const MAX_BODY = 200_000;
@@ -140,7 +144,11 @@ async function readBody(req) {
     if (size > MAX_BODY) throw Object.assign(new Error("Lista demasiado larga."), { status: 413 });
     chunks.push(chunk);
   }
-  return JSON.parse(Buffer.concat(chunks).toString() || "{}");
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString() || "{}") ?? {};
+  } catch {
+    throw Object.assign(new Error("JSON inválido."), { status: 400 });
+  }
 }
 
 const indexHtml = await readFile(new URL("./public/index.html", import.meta.url), "utf8");
@@ -162,12 +170,37 @@ const server = http.createServer(async (req, res) => {
       const items = parseLinks(String(texto));
       if (items.length === 0) return send(res, 400, { error: "No encontré links en el texto." });
       if (items.length > 150) return send(res, 400, { error: "Máximo 150 links por pauta." });
-      const orden = await ordenar(items, String(criterio).slice(0, 500));
-      return send(res, 200, { items: reconciliar(items, orden), model: MODEL });
+      const crit = String(criterio).slice(0, 500);
+      const orden = await ordenar(items, crit);
+      const pauta = await createPauta({ criterio: crit, items: reconciliar(items, orden) });
+      return send(res, 200, { pauta, model: MODEL });
     } catch (err) {
       console.error(err);
-      const status = err.status === 413 ? 413 : 502;
+      const status = err.status === 413 || err.status === 400 ? err.status : 502;
       return send(res, status, { error: err.message || "Error inesperado." });
+    }
+  }
+
+  // Historial: /api/pautas y /api/pautas/:id
+  const path = req.url.split("?")[0];
+  const m = path.match(/^\/api\/pautas(?:\/([^/]+))?$/);
+  if (m) {
+    const id = m[1]; // el store valida el formato (sin path traversal)
+    try {
+      if (!id && req.method === "GET") return send(res, 200, { pautas: await listPautas() });
+      if (id && req.method === "GET") return send(res, 200, { pauta: await getPauta(id) });
+      if (id && req.method === "PUT") {
+        const { order, done } = await readBody(req);
+        return send(res, 200, { pauta: await updatePauta(id, { order, done }) });
+      }
+      if (id && req.method === "DELETE") {
+        await deletePauta(id);
+        return send(res, 200, { ok: true });
+      }
+      return send(res, 405, { error: "Método no permitido." });
+    } catch (err) {
+      if (!err.status) console.error(err);
+      return send(res, err.status || 500, { error: err.status ? err.message : "Error inesperado." });
     }
   }
 

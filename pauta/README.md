@@ -77,6 +77,23 @@ To expose it publicly instead, put a reverse proxy with HTTPS (nginx, Caddy) in 
 | `CLAUDE_BIN` | `claude` | Path to the Claude Code binary if it isn't on `PATH`. |
 | `HOST` | `0.0.0.0` | Interface to listen on. Use `127.0.0.1` behind a proxy or `tailscale serve`. |
 | `PORT` | `3000` | |
+| `DATA_DIR` | `./data` (next to `server.js`) | Where the history of pautas is saved, one JSON file per pauta. Keep it outside the repo if your deploy runs `git reset --hard`. |
+
+## API
+
+Every pauta is saved on the server, so the UI can show a history and remember which links were
+already opened. All endpoints use the same auth as the page.
+
+| Method & path | Body | Response |
+|---|---|---|
+| `POST /api/ordenar` | `{ texto, criterio? }` | `{ pauta, model }` (calls Claude and saves the result) |
+| `GET /api/pautas` | | `{ pautas: [{ id, createdAt, updatedAt, count, doneCount, preview }] }`, newest first (max 30) |
+| `GET /api/pautas/:id` | | `{ pauta }` |
+| `PUT /api/pautas/:id` | `{ order?, done? }` | `{ pauta }`. `order` must be a permutation of all item ids; `done` is the full list of opened item ids. |
+| `DELETE /api/pautas/:id` | | `{ ok: true }` |
+
+A pauta is `{ id, createdAt, updatedAt, criterio, items: [{ id, title, url, domain, tono, motivo, done }] }`;
+the order of `items` is the running order. Invalid input returns `400`, unknown ids `404`, both as `{ error }`.
 
 ## Tuning the editorial rules
 
@@ -88,4 +105,11 @@ optional "extra instruction" field for the day.
 
 ```bash
 npm test
+```
+
+To try the whole app without spending Claude usage, point `CLAUDE_BIN` at the bundled fake, which
+shuffles the links and assigns random tones (`FAKE_DELAY_MS` sets its response delay, default 1500):
+
+```bash
+DATA_DIR=$(mktemp -d) CLAUDE_BIN=./test/fake-claude.js FAKE_DELAY_MS=300 npm run dev
 ```

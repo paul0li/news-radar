@@ -47,6 +47,17 @@
   .tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 99px; white-space: nowrap; background: var(--neutral-bg); color: var(--neutral); }
   .gracioso .tag { background: var(--fun-bg); color: var(--fun); }
   .serio .tag { background: var(--serious-bg); color: var(--serious); }
+  #history { margin-top: 28px; }
+  #history h2 { font: 700 17px Georgia, serif; margin: 0 0 8px; }
+  #historyEmpty { color: var(--muted); font-size: 13px; margin: 0; }
+  .h-item { display: flex; align-items: stretch; background: var(--card); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; min-width: 0; }
+  .h-item.active { border-color: var(--accent); }
+  .h-open { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; text-align: left; background: transparent; color: var(--ink); padding: 9px 12px; font: 14px/1.35 system-ui, sans-serif; }
+  .h-date { font-weight: 600; white-space: nowrap; }
+  .h-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .h-prev { flex-basis: 100%; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .h-del { background: transparent; color: var(--muted); padding: 0 14px; font-size: 20px; line-height: 1; border-left: 1px solid var(--line); border-radius: 0 8px 8px 0; }
+  .h-del:hover { color: #dc2626; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -67,6 +78,12 @@
     <span id="status"></span>
   </div>
 
+  <section id="history">
+    <h2>Historial</h2>
+    <p id="historyEmpty" hidden>Todavía no hay pautas.</p>
+    <div id="historyList"></div>
+  </section>
+
   <section id="result" hidden>
     <h2>Orden sugerido</h2>
     <div class="rhythm" id="rhythm" title="Ritmo de la pauta"></div>
@@ -81,12 +98,51 @@
 <script>
   const $ = (id) => document.getElementById(id);
   const colors = { gracioso: "var(--fun)", serio: "var(--serious)", neutro: "var(--neutral)" };
-  let items = [];
+  let current = null; // pauta abierta: { id, createdAt, updatedAt, criterio, items }
+  let items = []; // = current.items (orden actual)
 
   try { $("texto").value = localStorage.getItem("pauta:texto") || ""; } catch {}
   $("texto").addEventListener("input", () => { try { localStorage.setItem("pauta:texto", $("texto").value); } catch {} });
 
   function status(msg, err = false) { $("status").textContent = msg; $("status").className = err ? "err" : ""; }
+
+  async function api(path, opts = {}) {
+    const r = await fetch(path, opts.body ? { ...opts, headers: { "content-type": "application/json" } } : opts);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
+    return data;
+  }
+
+  // "mar 14 oct, 17:09" en hora local
+  function fecha(iso) {
+    const d = new Date(iso);
+    const p = Object.fromEntries(new Intl.DateTimeFormat("es-CL", { weekday: "short", day: "numeric", month: "short" })
+      .formatToParts(d).map((x) => [x.type, x.value.replace(".", "")]));
+    const hora = d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return `${p.weekday} ${p.day} ${p.month}, ${hora}`;
+  }
+
+  function setPauta(pauta) {
+    current = pauta;
+    items = pauta ? pauta.items : [];
+    render();
+    document.querySelectorAll(".h-item").forEach((el) => el.classList.toggle("active", !!current && el.dataset.id === current.id));
+  }
+
+  // Guarda en el servidor qué links ya se abrieron (fire-and-forget).
+  function saveDone() {
+    if (!current) return;
+    const done = items.filter((it) => it.done).map((it) => it.id);
+    api(`api/pautas/${current.id}`, { method: "PUT", body: JSON.stringify({ done }) })
+      .then(() => loadHistory())
+      .catch((e) => console.warn("No pude guardar los vistos:", e));
+  }
+
+  function markDone(it) {
+    if (it.done) return;
+    it.done = true;
+    saveDone();
+  }
 
   function render() {
     $("list").innerHTML = "";
@@ -98,7 +154,7 @@
       const a = li.querySelector("a");
       a.href = it.url;
       a.textContent = it.title;
-      a.addEventListener("click", () => { it.done = true; li.classList.add("done"); });
+      a.addEventListener("click", () => { markDone(it); li.classList.add("done"); });
       li.querySelector(".meta").textContent = `${it.domain} · ${it.motivo}`;
       li.querySelector(".tag").textContent = it.tono;
       $("list").appendChild(li);
@@ -107,6 +163,53 @@
       $("rhythm").appendChild(bar);
     });
     $("result").hidden = items.length === 0;
+  }
+
+  async function loadHistory() {
+    let pautas;
+    try {
+      ({ pautas } = await api("api/pautas"));
+    } catch (e) {
+      console.warn("No pude cargar el historial:", e);
+      return;
+    }
+    const list = $("historyList");
+    list.innerHTML = "";
+    $("historyEmpty").hidden = pautas.length > 0;
+    for (const p of pautas) {
+      const row = document.createElement("div");
+      row.className = "h-item" + (current && current.id === p.id ? " active" : "");
+      row.dataset.id = p.id;
+      row.innerHTML = `<button class="h-open"><span class="h-date"></span><span class="h-meta"></span><span class="h-prev"></span></button><button class="h-del" title="Borrar" aria-label="Borrar pauta">×</button>`;
+      row.querySelector(".h-date").textContent = fecha(p.createdAt);
+      row.querySelector(".h-meta").textContent = `${p.count} links · ${p.doneCount}/${p.count} vistos`;
+      row.querySelector(".h-prev").textContent = p.preview[0] || "";
+      row.querySelector(".h-open").addEventListener("click", () => openPauta(p.id));
+      row.querySelector(".h-del").addEventListener("click", () => removePauta(p));
+      list.appendChild(row);
+    }
+  }
+
+  async function openPauta(id) {
+    try {
+      const { pauta } = await api(`api/pautas/${id}`);
+      setPauta(pauta);
+      status(`Pauta del ${fecha(pauta.createdAt)}`);
+      $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (e) {
+      status(e.message, true);
+    }
+  }
+
+  async function removePauta(p) {
+    if (!confirm(`¿Borrar la pauta del ${fecha(p.createdAt)}?`)) return;
+    try {
+      await api(`api/pautas/${p.id}`, { method: "DELETE" });
+      if (current && current.id === p.id) setPauta(null);
+      await loadHistory();
+    } catch (e) {
+      status(e.message, true);
+    }
   }
 
   $("go").addEventListener("click", async () => {
@@ -119,16 +222,13 @@
     tick();
     const timer = setInterval(tick, 1000);
     try {
-      const r = await fetch("api/ordenar", {
+      const data = await api("api/ordenar", {
         method: "POST",
-        headers: { "content-type": "application/json" },
         body: JSON.stringify({ texto, criterio: $("criterio").value.trim() }),
       });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
-      items = data.items;
-      render();
+      setPauta(data.pauta);
       status(`${items.length} links ordenados en ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+      loadHistory();
     } catch (e) {
       status(e.message, true);
     } finally {
@@ -146,9 +246,11 @@
     const it = items.find((x) => !x.done);
     if (!it) return status("Ya abriste todos.");
     window.open(it.url, "_blank", "noopener");
-    it.done = true;
+    markDone(it);
     render();
   });
+
+  loadHistory();
 </script>
 </body>
 </html>

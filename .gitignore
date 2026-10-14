@@ -208,3 +208,6 @@ __marimo__/
 
 # Node
 node_modules/
+
+# Pauta: historial local (en producción DATA_DIR apunta fuera del repo)
+pauta/data/
