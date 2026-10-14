@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { parseLinks } from "./parse.js";
 
 const PORT = Number(process.env.PORT || 3000);
+const HOST = process.env.HOST || "0.0.0.0";
 const MODEL = process.env.MODEL || "opus";
 const EFFORT = process.env.EFFORT || "low";
 const CLAUDE_BIN = process.env.CLAUDE_BIN || "claude";
@@ -173,4 +174,4 @@ const server = http.createServer(async (req, res) => {
   send(res, 404, { error: "No encontrado" });
 });
 
-server.listen(PORT, () => console.log(`Pauta editorial en http://localhost:${PORT} (modelo ${MODEL})`));
+server.listen(PORT, HOST, () => console.log(`Pauta editorial en http://${HOST}:${PORT} (modelo ${MODEL})`));

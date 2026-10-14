@@ -37,7 +37,17 @@ docker run -d --restart unless-stopped -p 3000:3000 \
   -e CLAUDE_CODE_OAUTH_TOKEN=... -e APP_PASSWORD=algo pauta
 ```
 
-Ponle delante el reverse proxy que ya tenga la instancia (Caddy/nginx) para HTTPS. `GET /healthz` responde `ok` sin auth.
+### Hermes (instalación actual)
+
+Servicio systemd [`deploy/pauta.service`](deploy/pauta.service), escuchando solo en la IP de Tailscale:
+**http://hermes-instance:3010**. Variables en `~/.config/pauta/pauta.env` (fuera de la repo).
+
+```bash
+rsync -a --delete --exclude node_modules --exclude .env pauta/ hermes-ts:news-radar/pauta/
+ssh hermes-ts 'sudo systemctl restart pauta'
+```
+
+Para exponerla públicamente, ponle delante el reverse proxy que ya tenga la instancia (Caddy/nginx) para HTTPS. `GET /healthz` responde `ok` sin auth.
 
 ## Variables de entorno
 
@@ -49,6 +59,7 @@ Ponle delante el reverse proxy que ya tenga la instancia (Caddy/nginx) para HTTP
 | `EFFORT` | `low` | `low`/`medium`/`high`. Ordenar 40 títulos no necesita más que `low`. |
 | `CLAUDE_BIN` | `claude` | Ruta al ejecutable si no está en el `PATH`. |
 | `PORT` | `3000` | |
+| `HOST` | `0.0.0.0` | Interfaz donde escucha. En Hermes: la IP de Tailscale, para que solo se vea dentro de la tailnet. |
 
 ## Ajustar el criterio editorial
 

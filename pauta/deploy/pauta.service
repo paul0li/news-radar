@@ -1,0 +1,16 @@
+[Unit]
+Description=Pauta editorial (news-radar) — solo tailnet
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/news-radar/pauta
+EnvironmentFile=/home/ubuntu/.config/pauta/pauta.env
+Environment=PATH=/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
