@@ -113,8 +113,11 @@
     const texto = $("texto").value.trim();
     if (!texto) return status("Pega la lista primero.", true);
     $("go").disabled = true;
-    status("Armando la pauta…");
     const t0 = Date.now();
+    const n = (texto.match(/https?:\/\//g) || []).length;
+    const tick = () => status(`Armando la pauta de ${n} links… ${Math.round((Date.now() - t0) / 1000)} s (suele tardar ~1 min)`);
+    tick();
+    const timer = setInterval(tick, 1000);
     try {
       const r = await fetch("api/ordenar", {
         method: "POST",
@@ -129,6 +132,7 @@
     } catch (e) {
       status(e.message, true);
     } finally {
+      clearInterval(timer);
       $("go").disabled = false;
     }
   });
