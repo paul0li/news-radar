@@ -13,10 +13,10 @@ before(async () => {
 after(() => rm(dir, { recursive: true, force: true }));
 
 const items = [
-  { id: 1, title: "Uno", url: "https://a.cl/1", domain: "a.cl", tono: "gracioso", motivo: "abre" },
-  { id: 2, title: "Dos", url: "https://b.cl/2", domain: "b.cl", tono: "serio", motivo: "medio" },
-  { id: 3, title: "Tres", url: "https://c.cl/3", domain: "c.cl", tono: "neutro", motivo: "cierra" },
-  { id: 4, title: "Cuatro", url: "https://d.cl/4", domain: "d.cl", tono: "neutro", motivo: "extra" },
+  { id: 1, title: "Uno", url: "https://a.cl/1", domain: "a.cl", tono: "gracioso" },
+  { id: 2, title: "Dos", url: "https://b.cl/2", domain: "b.cl", tono: "serio" },
+  { id: 3, title: "Tres", url: "https://c.cl/3", domain: "c.cl", tono: "neutro" },
+  { id: 4, title: "Cuatro", url: "https://d.cl/4", domain: "d.cl", tono: "neutro" },
 ];
 
 test("create, get y list (más nueva primero)", async () => {

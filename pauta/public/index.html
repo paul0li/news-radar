@@ -402,7 +402,7 @@
       const opened = () => { if (markDone(it)) hideItem(li); };
       a.addEventListener("click", opened);
       a.addEventListener("auxclick", (e) => { if (e.button === 1) opened(); });
-      li.querySelector(".meta").textContent = `${it.domain} · ${it.motivo}`;
+      li.querySelector(".meta").textContent = it.domain;
       li.querySelector(".tag").textContent = it.tono;
       const grip = li.querySelector(".grip");
       grip.title = "Arrastra para mover (o usa ↑ ↓)";

@@ -52,7 +52,7 @@ export async function createPauta({ criterio = "", items }) {
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
     criterio,
-    items: items.map(({ id, title, titulo, url, domain, tono, motivo }) => ({ id, title, titulo: titulo || title, url, domain, tono, motivo, done: false })),
+    items: items.map(({ id, title, titulo, url, domain, tono }) => ({ id, title, titulo: titulo || title, url, domain, tono, done: false })),
   };
   return save(pauta);
 }

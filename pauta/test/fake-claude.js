@@ -15,7 +15,7 @@ process.stdin.on("end", () => {
   }
   const orden = ids.map((id) => {
     const tono = TONOS[Math.floor(Math.random() * TONOS.length)];
-    return { id, tono, motivo: `(fake) ${tono} al azar`, titulo: `(fake) Título reescrito ${id}` };
+    return { id, tono, titulo: `(fake) Título reescrito ${id}` };
   });
   const out = {
     type: "result",
