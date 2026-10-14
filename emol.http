@@ -1,0 +1,18 @@
+GET /NewsApi/emol/noticia/1175574 HTTP/1.1
+host: newsapi.ecn.cl
+accept: application/json, text/javascript, */*; q=0.01
+accept-language: es-419,es;q=0.8
+cache-control: no-cache
+origin: https://www.emol.com
+pragma: no-cache
+priority: u=1, i
+referer: https://www.emol.com/
+sec-ch-ua: "Not;A=Brand";v="99", "Brave";v="139", "Chromium";v="139"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "macOS"
+sec-fetch-dest: empty
+sec-fetch-mode: cors
+sec-fetch-site: cross-site
+sec-gpc: 1
+user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36
+

@@ -1,0 +1,22 @@
+import http.client
+
+conn = http.client.HTTPSConnection('www.biobiochile.cl')
+headers = {
+    'accept': 'application/json, text/plain, */*',
+    'accept-language': 'es-419,es;q=0.6',
+    'cache-control': 'no-cache',
+    'pragma': 'no-cache',
+    'priority': 'u=1, i',
+    'referer': 'https://www.biobiochile.cl/noticias/nacional/chile/2025/08/20/camara-aprueba-en-general-proyecto-que-crea-el-fes-y-pone-fin-al-cae.shtml',
+    'sec-ch-ua': '"Not;A=Brand";v="99", "Brave";v="139", "Chromium";v="139"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"macOS"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin',
+    'sec-gpc': '1',
+    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+}
+conn.request('GET', '/static/news.json?t=1755729275860', headers=headers)
+response = conn.getresponse()
+print(response.read())
