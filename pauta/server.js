@@ -2,16 +2,17 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
-import Anthropic from "@anthropic-ai/sdk";
+import { spawn } from "node:child_process";
+import { tmpdir } from "node:os";
 import { parseLinks } from "./parse.js";
 
 const PORT = Number(process.env.PORT || 3000);
-const MODEL = process.env.MODEL || "claude-opus-5-5";
+const MODEL = process.env.MODEL || "opus";
 const EFFORT = process.env.EFFORT || "low";
+const CLAUDE_BIN = process.env.CLAUDE_BIN || "claude";
+const TIMEOUT_MS = 180_000;
 const APP_PASSWORD = process.env.APP_PASSWORD || "";
 const MAX_BODY = 200_000;
-
-const client = new Anthropic(); // lee ANTHROPIC_API_KEY del entorno
 
 const SYSTEM = `Eres el editor de pauta de una transmisión en vivo donde se comentan links (noticias, redes sociales, videos).
 Tu trabajo: ordenar los links para retener a la audiencia y que no abandone la transmisión.
@@ -47,25 +48,54 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
+// Llama a Claude Code en modo headless (`claude -p`), usando la sesión/suscripción de la máquina.
+function runClaude(prompt) {
+  const args = [
+    "-p",
+    "--output-format", "json",
+    "--json-schema", JSON.stringify(SCHEMA),
+    "--system-prompt", SYSTEM,
+    "--model", MODEL,
+    "--effort", EFFORT,
+    "--tools", "",
+    "--setting-sources", "",
+    "--strict-mcp-config",
+    "--no-session-persistence",
+  ];
+  return new Promise((resolve, reject) => {
+    // cwd temporal para que no cargue CLAUDE.md ni configuración de ningún proyecto.
+    const child = spawn(CLAUDE_BIN, args, { cwd: tmpdir(), stdio: ["pipe", "pipe", "pipe"] });
+    let out = "";
+    let err = "";
+    const timer = setTimeout(() => child.kill("SIGTERM"), TIMEOUT_MS);
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (err += d));
+    child.on("error", (e) =>
+      reject(new Error(e.code === "ENOENT" ? `No encontré el comando "${CLAUDE_BIN}". ¿Está instalado Claude Code?` : e.message)),
+    );
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      if (signal) return reject(new Error("Claude tardó demasiado en responder."));
+      let data;
+      try {
+        data = JSON.parse(out);
+      } catch {
+        return reject(new Error((err || out || `claude terminó con código ${code}`).trim().slice(0, 500)));
+      }
+      if (data.is_error || !data.structured_output) {
+        return reject(new Error(String(data.result || data.subtype || "Error de Claude Code").slice(0, 500)));
+      }
+      resolve(data.structured_output);
+    });
+    child.stdin.end(prompt);
+  });
+}
+
 async function ordenar(items, criterio) {
   const lista = items.map((it) => `${it.id}. ${it.title} (${it.domain})`).join("\n");
   const extra = criterio ? `\n\nIndicación extra del editor para hoy: ${criterio}` : "";
-
-  const response = await client.beta.messages.create({
-    model: MODEL,
-    max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: EFFORT, format: { type: "json_schema", schema: SCHEMA } },
-    system: SYSTEM,
-    messages: [{ role: "user", content: `Links de hoy (id. título (dominio)):\n${lista}${extra}` }],
-  });
-
-  if (response.stop_reason === "refusal") throw new Error("El modelo rechazó la solicitud.");
-  if (response.stop_reason === "max_tokens") throw new Error("Respuesta truncada; intenta con menos links.");
-  const text = response.content.find((b) => b.type === "text")?.text;
-  if (!text) throw new Error("Respuesta vacía del modelo.");
-  return JSON.parse(text).orden;
+  const { orden } = await runClaude(`Links de hoy (id. título (dominio)):\n${lista}${extra}`);
+  return orden;
 }
 
 // Garantiza una permutación válida: descarta ids inventados/duplicados y agrega al final los que falten.
@@ -135,7 +165,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { items: reconciliar(items, orden), model: MODEL });
     } catch (err) {
       console.error(err);
-      const status = err.status && err.status < 500 && err.status !== 401 ? err.status : 502;
+      const status = err.status === 413 ? 413 : 502;
       return send(res, status, { error: err.message || "Error inesperado." });
     }
   }

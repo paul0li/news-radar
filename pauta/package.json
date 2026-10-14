@@ -11,8 +11,5 @@
     "start": "node server.js",
     "dev": "node --watch --env-file-if-exists=.env server.js",
     "test": "node --test"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.133.0"
   }
 }
