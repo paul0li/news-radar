@@ -62,13 +62,11 @@
   #armando h2 { font: 700 20px Georgia, serif; margin: 0 0 4px; }
   #armando .sub { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
   .shuffle { position: relative; }
-  .sc { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; height: 46px; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--neutral); border-radius: 8px; padding: 0 12px; margin-bottom: 8px; transition: border-color .4s; }
-  .sc.gracioso { border-left-color: var(--fun); }
-  .sc.serio { border-left-color: var(--serious); }
-  .sc.lift { z-index: 2; box-shadow: 0 8px 22px var(--shadow); }
-  .sc-t { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sc-bar { flex: 1; height: 10px; border-radius: 5px; background: var(--line); }
-  .sc-grip { color: var(--muted); font-size: 14px; letter-spacing: -2px; user-select: none; }
+  .shuffle { max-width: 420px; padding: 6px 0; }
+  .sc { --tone: var(--neutral); position: relative; height: 8px; border-radius: 4px; margin-bottom: 14px; background: linear-gradient(to right, var(--tone) 0 22px, var(--line) 22px); }
+  .sc.gracioso { --tone: var(--fun); }
+  .sc.serio { --tone: var(--serious); }
+  .sc.lift { z-index: 2; }
   #armandoStatus { margin-top: 10px; }
   @media (prefers-reduced-motion: reduce) {
     .view-enter { animation: none; }
@@ -156,7 +154,6 @@
     <!-- Pantalla mientras Claude ordena -->
     <section id="armando" hidden aria-busy="true">
       <h2>Armando la pauta…</h2>
-      <p class="sub">Claude está intercalando lo gracioso con lo serio.</p>
       <div id="shuffle" class="shuffle" aria-hidden="true"></div>
       <p id="armandoStatus" class="status" role="status"></p>
     </section>
@@ -710,20 +707,6 @@
 
   const shuffler = { timer: null };
 
-  // Títulos aproximados desde el texto pegado: líneas sin URLs ni viñetas.
-  function guessTitles(texto) {
-    const seen = new Set();
-    const out = [];
-    for (const line of texto.split(/\r?\n/)) {
-      const t = line.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/https?:\/\/\S+/gi, " ")
-        .replace(/^\s*(?:[-*•▪►→]|\d+[.)-]|#)\s*/, "").replace(/\s+/g, " ").trim();
-      if (t.length < 3 || seen.has(t)) continue;
-      seen.add(t);
-      out.push(t);
-    }
-    return out;
-  }
-
   const rand = (n) => Math.floor(Math.random() * n);
   function shuffled(arr) {
     const a = arr.slice();
@@ -734,22 +717,16 @@
   function setTone(card, tono) {
     card.classList.remove(...TONOS);
     card.classList.add(tono);
-    card.querySelector(".tag").textContent = tono;
   }
 
-  function buildCards(texto) {
+  // Barras abstractas: solo color de tono y largo variable, sin texto.
+  function buildCards() {
     const box = $("shuffle");
     box.replaceChildren();
-    const titles = shuffled(guessTitles(texto)).slice(0, 7);
-    while (titles.length < 7) titles.push(null); // relleno con barras genéricas
-    for (const title of titles) {
+    for (let i = 0; i < 5; i++) {
       const card = document.createElement("div");
       card.className = "sc";
-      card.innerHTML = `<span class="sc-grip">⋮⋮</span><span class="tag"></span>`;
-      const body = document.createElement("span");
-      if (title) { body.className = "sc-t"; body.textContent = title; }
-      else { body.className = "sc-bar"; body.style.maxWidth = `${45 + rand(45)}%`; }
-      card.insertBefore(body, card.lastChild);
+      card.style.width = `${40 + rand(55)}%`;
       setTone(card, TONOS[rand(3)]);
       box.appendChild(card);
     }
@@ -765,7 +742,7 @@
       if (!dy) continue;
       const lift = lifted.includes(k);
       const frames = lift
-        ? [{ transform: `translateY(${dy}px)` }, { transform: `translateY(${dy / 2}px) scale(1.035)`, offset: 0.5 }, { transform: "none" }]
+        ? [{ transform: `translateY(${dy}px)` }, { transform: `translateY(${dy / 2}px) scale(1.02)`, offset: 0.5 }, { transform: "none" }]
         : [{ transform: `translateY(${dy}px)` }, { transform: "none" }];
       if (lift) k.classList.add("lift");
       const anim = k.animate(frames, { duration: lift ? 620 : 520, easing: "cubic-bezier(.2,.75,.25,1)" });
@@ -806,10 +783,10 @@
     }
   }
 
-  function startShuffle(texto) {
-    buildCards(texto);
+  function startShuffle() {
+    buildCards();
     stopShuffle();
-    shuffler.timer = setInterval(shuffleStep, reduceMotion.matches ? 1600 : 800);
+    shuffler.timer = setInterval(shuffleStep, reduceMotion.matches ? 1600 : 1000);
   }
 
   function stopShuffle() {
@@ -838,7 +815,7 @@
     const tick = () => { $("armandoStatus").textContent = `Armando la pauta de ${n} links… ${Math.round((Date.now() - t0) / 1000)} s (suele tardar ~1 min)`; };
     tick();
     const timer = setInterval(tick, 1000);
-    startShuffle(texto);
+    startShuffle();
     showArmando(true);
     try {
       const data = await api("api/ordenar", {
