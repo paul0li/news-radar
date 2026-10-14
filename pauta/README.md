@@ -89,6 +89,8 @@ Optional URL parameters:
 | `etiqueta` | `Titulares` | Label text; empty (`etiqueta=`) hides it. |
 | `posicion` | `abajo` | `abajo` or `arriba`. |
 | `fuente` | `system-ui` | Font family. |
+| `aviso` | empty | Highlighted message shown between headlines (e.g. a fundraising call). |
+| `cada` | `5` | Show `aviso` after every N headlines (at least once per loop). |
 
 Example: `/ticker?tam=48&velocidad=120&etiqueta=Hoy`. The data comes from `GET /api/ticker`
 (`{ id, createdAt, titulares: [{ texto, tono }] }`).

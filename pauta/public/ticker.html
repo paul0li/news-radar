@@ -14,6 +14,8 @@
     etiqueta   texto de la etiqueta (TITULARES); vacío para ocultarla
     posicion   abajo | arriba (abajo)
     fuente     familia tipográfica (system-ui)
+    aviso      texto destacado que aparece entre los titulares (p. ej. una campaña)
+    cada       cada cuántos titulares aparece el aviso (5)
   Ej: /ticker?tam=48&velocidad=120&etiqueta=HOY
 -->
 <style>
@@ -30,6 +32,8 @@
   .dot { width: calc(var(--tam) * .32); height: calc(var(--tam) * .32); border-radius: 50%; margin-right: calc(var(--tam) * .45); background: #a8a29e; flex: none; }
   .gracioso .dot { background: #fbbf24; }
   .serio .dot { background: #60a5fa; }
+  .aviso { display: inline-flex; align-items: center; margin-right: calc(var(--tam) * 1.4); padding: calc(var(--tam) * .22) calc(var(--tam) * .5); border-radius: calc(var(--tam) * .3); background: var(--acento); color: #fff; }
+  .aviso::before { content: "♥"; margin-right: calc(var(--tam) * .35); font-size: .8em; }
 </style>
 </head>
 <body>
@@ -52,6 +56,8 @@
   if (q.get("acento")) root.setProperty("--acento", q.get("acento"));
   if (q.get("fuente")) root.setProperty("--fuente", q.get("fuente"));
   if (q.get("posicion") === "arriba") document.getElementById("bar").classList.add("arriba");
+  const AVISO = (q.get("aviso") || "").trim().slice(0, 200);
+  const CADA = num("cada", 5, 1, 100);
   const etiqueta = q.has("etiqueta") ? q.get("etiqueta") : "Titulares";
   const label = document.getElementById("label");
   label.textContent = etiqueta;
@@ -66,14 +72,21 @@
   function buildSeq(titulares) {
     const seq = document.createElement("div");
     seq.className = "seq";
-    for (const t of titulares) {
+    titulares.forEach((t, i) => {
       const item = document.createElement("span");
       item.className = `item ${t.tono || "neutro"}`;
       const dot = document.createElement("span");
       dot.className = "dot";
       item.append(dot, document.createTextNode(t.texto));
       seq.appendChild(item);
-    }
+      // El aviso va cada CADA titulares (y al menos una vez por vuelta).
+      if (AVISO && ((i + 1) % CADA === 0 || (i === titulares.length - 1 && titulares.length < CADA))) {
+        const aviso = document.createElement("span");
+        aviso.className = "aviso";
+        aviso.textContent = AVISO;
+        seq.appendChild(aviso);
+      }
+    });
     return seq;
   }
 
