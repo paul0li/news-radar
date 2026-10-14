@@ -47,12 +47,10 @@ porque estar en Tailscale ya es la autenticación.
   `sudo tailscale serve --bg --https=443 http://127.0.0.1:3010`
 - Variables (incluido el token) en `~/.config/pauta/pauta.env`, fuera de la repo.
 
-Actualizar:
-
-```bash
-rsync -a --delete --exclude node_modules --exclude .env pauta/ hermes-ts:news-radar/pauta/
-ssh hermes-ts 'sudo systemctl restart pauta'
-```
+Deploy automático: `~/news-radar` en Hermes es un clon de esta repo y un cron corre
+[`deploy/autodeploy.sh`](deploy/autodeploy.sh) cada minuto. **Todo lo que llegue a `main` queda
+desplegado en ~1 minuto** (log en `~/news-radar-deploy.log`). Para pausarlo:
+`touch ~/.news-radar-autodeploy-paused`.
 
 En otro servidor: ponle delante el reverse proxy que ya tenga la instancia (Caddy/nginx) para HTTPS. `GET /healthz` responde `ok` sin auth.
 
