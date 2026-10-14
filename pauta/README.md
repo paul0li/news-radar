@@ -39,15 +39,16 @@ docker run -d --restart unless-stopped -p 3000:3000 \
 
 ### Hermes (instalación actual)
 
-Servicio systemd [`deploy/pauta.service`](deploy/pauta.service), escuchando solo en la IP de Tailscale:
-**http://hermes-instance:3010**. Variables en `~/.config/pauta/pauta.env` (fuera de la repo).
+**https://news-radar.paul0li.tech**: nginx + certbot → `127.0.0.1:3010`, servicio systemd
+[`deploy/pauta.service`](deploy/pauta.service), sitio [`deploy/nginx-news-radar.paul0li.tech.conf`](deploy/nginx-news-radar.paul0li.tech.conf).
+Variables (token y clave incluidos) en `~/.config/pauta/pauta.env`, fuera de la repo.
 
 ```bash
 rsync -a --delete --exclude node_modules --exclude .env pauta/ hermes-ts:news-radar/pauta/
 ssh hermes-ts 'sudo systemctl restart pauta'
 ```
 
-Para exponerla públicamente, ponle delante el reverse proxy que ya tenga la instancia (Caddy/nginx) para HTTPS. `GET /healthz` responde `ok` sin auth.
+En otro servidor: ponle delante el reverse proxy que ya tenga la instancia (Caddy/nginx) para HTTPS. `GET /healthz` responde `ok` sin auth.
 
 ## Variables de entorno
 
