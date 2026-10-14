@@ -9,19 +9,20 @@
   :root {
     --bg: #f6f3ec; --card: #fffdf8; --ink: #1d1b16; --muted: #6d675b; --line: #ddd5c4;
     --accent: #c2410c; --fun: #d97706; --fun-bg: #fef3c7; --serious: #1e40af; --serious-bg: #dbeafe;
-    --neutral: #57534e; --neutral-bg: #eeebe5;
+    --neutral: #57534e; --neutral-bg: #eeebe5; --shadow: rgba(60, 45, 20, .18); --err: #dc2626;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #16140f; --card: #1f1c16; --ink: #f1ece2; --muted: #a39b8b; --line: #3a352b;
       --accent: #fb923c; --fun: #fbbf24; --fun-bg: #3b2a08; --serious: #93c5fd; --serious-bg: #172554;
-      --neutral: #d6d3d1; --neutral-bg: #2c2924;
+      --neutral: #d6d3d1; --neutral-bg: #2c2924; --shadow: rgba(0, 0, 0, .55); --err: #f87171;
     }
   }
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
   main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
-  header h1 { font: 800 30px/1.1 Georgia, "Times New Roman", serif; margin: 0 0 20px; letter-spacing: -0.5px; }
+  h1 { font: 800 30px/1.1 Georgia, "Times New Roman", serif; margin: 0 0 20px; letter-spacing: -0.5px; }
   textarea, input { width: 100%; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: inherit; }
   textarea { min-height: 220px; resize: vertical; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
   label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: 13px; }
@@ -29,87 +30,160 @@
   button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; font: 600 15px system-ui, sans-serif; cursor: pointer; }
   button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
   button:disabled { opacity: .6; cursor: wait; }
-  #status { color: var(--muted); font-size: 13px; }
-  #status.err { color: #dc2626; }
-  #result { margin-top: 28px; }
-  #result h2 { font: 700 20px Georgia, serif; margin: 0 0 4px; }
-  .rhythm { display: flex; gap: 2px; margin: 8px 0 14px; }
-  .rhythm span { flex: 1; height: 8px; border-radius: 2px; }
-  ol { list-style: none; padding: 0; margin: 0; }
-  li { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: start; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--neutral); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
-  li.gracioso { border-left-color: var(--fun); }
-  li.serio { border-left-color: var(--serious); }
-  li.done { opacity: .45; }
-  .n { font: 700 18px Georgia, serif; color: var(--muted); text-align: right; }
-  .t a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
-  .t a:hover { text-decoration: underline; }
-  .meta { font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
-  .tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 99px; white-space: nowrap; background: var(--neutral-bg); color: var(--neutral); }
-  .gracioso .tag { background: var(--fun-bg); color: var(--fun); }
-  .serio .tag { background: var(--serious-bg); color: var(--serious); }
+  .status { color: var(--muted); font-size: 13px; }
+  .status.err { color: var(--err); }
+  [hidden] { display: none !important; }
+
+  /* Vistas */
+  .view-enter { animation: enter .28s ease-out; }
+  @keyframes enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  /* Historial (vista inicio) */
   #history { margin-top: 28px; }
   #history h2 { font: 700 17px Georgia, serif; margin: 0 0 8px; }
   #historyEmpty { color: var(--muted); font-size: 13px; margin: 0; }
   .h-item { display: flex; align-items: stretch; background: var(--card); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; min-width: 0; }
-  .h-item.active { border-color: var(--accent); }
   .h-open { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; text-align: left; background: transparent; color: var(--ink); padding: 9px 12px; font: 14px/1.35 system-ui, sans-serif; }
   .h-date { font-weight: 600; white-space: nowrap; }
   .h-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
   .h-prev { flex-basis: 100%; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .h-del { background: transparent; color: var(--muted); padding: 0 14px; font-size: 20px; line-height: 1; border-left: 1px solid var(--line); border-radius: 0 8px 8px 0; }
-  .h-del:hover { color: #dc2626; }
-  [hidden] { display: none !important; }
+  .h-del:hover { color: var(--err); }
+
+  /* Etiqueta de tono (lista y animación) */
+  .tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 99px; white-space: nowrap; background: var(--neutral-bg); color: var(--neutral); transition: background-color .4s, color .4s; }
+  .gracioso .tag { background: var(--fun-bg); color: var(--fun); }
+  .serio .tag { background: var(--serious-bg); color: var(--serious); }
+
+  /* Pantalla "armando" */
+  #armando h2 { font: 700 20px Georgia, serif; margin: 0 0 4px; }
+  #armando .sub { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+  .shuffle { position: relative; }
+  .sc { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; height: 46px; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--neutral); border-radius: 8px; padding: 0 12px; margin-bottom: 8px; transition: border-color .4s; }
+  .sc.gracioso { border-left-color: var(--fun); }
+  .sc.serio { border-left-color: var(--serious); }
+  .sc.lift { z-index: 2; box-shadow: 0 8px 22px var(--shadow); }
+  .sc-t { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sc-bar { flex: 1; height: 10px; border-radius: 5px; background: var(--line); }
+  .sc-grip { color: var(--muted); font-size: 14px; letter-spacing: -2px; user-select: none; }
+  #armandoStatus { margin-top: 10px; }
+  @media (prefers-reduced-motion: reduce) {
+    .view-enter { animation: none; }
+    .shuffle .sc { animation: pulse 2.4s ease-in-out infinite; }
+    .shuffle .sc:nth-child(2n) { animation-delay: -1.2s; }
+  }
+  @keyframes pulse { 50% { opacity: .55; } }
+
+  /* Vista pauta */
+  .p-bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; margin: -24px -16px 0; padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .back { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px 0 12px; margin-left: -4px; border: 1px solid var(--line); border-radius: 22px; background: var(--card); color: var(--ink); font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .back:hover { border-color: var(--accent); }
+  .p-bar-title { min-width: 0; font: 700 15px Georgia, serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #viewPauta h2 { font: 700 22px/1.2 Georgia, serif; margin: 20px 0 2px; }
+  .p-meta { color: var(--muted); font-size: 13px; margin: 0; }
+  .p-crit { margin: 8px 0 0; font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--card); border: 1px dashed var(--line); overflow-wrap: anywhere; }
+  .p-crit b { font-weight: 600; color: var(--muted); }
+  .rhythm { display: flex; gap: 2px; margin: 14px 0 0; }
+  .rhythm span { flex: 1; height: 8px; border-radius: 2px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 14px 0; }
+  .plist { list-style: none; padding: 0; margin: 0; }
+  .plist > li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: start; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--neutral); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .plist > li.gracioso { border-left-color: var(--fun); }
+  .plist > li.serio { border-left-color: var(--serious); }
+  .plist > li.done { opacity: .45; }
+  .plist .n { font: 700 18px Georgia, serif; color: var(--muted); text-align: right; }
+  .plist .t a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+  .plist .t a:hover { text-decoration: underline; }
+  .plist .meta { font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+  @media (max-width: 420px) {
+    .plist > li { grid-template-columns: 24px minmax(0, 1fr); }
+    .plist > li .tag { grid-column: 2; justify-self: start; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <header>
+  <!-- Vista inicio: #/ -->
+  <section id="viewInicio">
     <h1>📡 Pauta editorial</h1>
-  </header>
 
-  <label for="texto">Links de hoy (título + link, en cualquier formato)</label>
-  <textarea id="texto" placeholder="Perro se roba un pollo en pleno noticiero&#10;https://www.tiktok.com/@...&#10;&#10;Banco Central sube la tasa de interés https://www.latercera.com/..."></textarea>
+    <div id="form">
+      <label for="texto">Links de hoy (título + link, en cualquier formato)</label>
+      <textarea id="texto" placeholder="Perro se roba un pollo en pleno noticiero&#10;https://www.tiktok.com/@...&#10;&#10;Banco Central sube la tasa de interés https://www.latercera.com/..."></textarea>
 
-  <label for="criterio">Indicación extra (opcional)</label>
-  <input id="criterio" maxlength="500" placeholder="Ej: abrir con lo del Congreso; dejar el video del gato para el cierre">
+      <label for="criterio">Indicación extra (opcional)</label>
+      <input id="criterio" maxlength="500" placeholder="Ej: abrir con lo del Congreso; dejar el video del gato para el cierre">
 
-  <div class="row">
-    <button id="go">Armar pauta</button>
-    <span id="status"></span>
-  </div>
+      <div class="row">
+        <button id="go">Armar pauta</button>
+        <span id="status" class="status" role="status"></span>
+      </div>
 
-  <section id="history">
-    <h2>Historial</h2>
-    <p id="historyEmpty" hidden>Todavía no hay pautas.</p>
-    <div id="historyList"></div>
+      <section id="history">
+        <h2>Historial</h2>
+        <p id="historyEmpty" hidden>Todavía no hay pautas.</p>
+        <div id="historyList"></div>
+      </section>
+    </div>
+
+    <!-- Pantalla mientras Claude ordena -->
+    <section id="armando" hidden aria-busy="true">
+      <h2>Armando la pauta…</h2>
+      <p class="sub">Claude está intercalando lo gracioso con lo serio.</p>
+      <div id="shuffle" class="shuffle" aria-hidden="true"></div>
+      <p id="armandoStatus" class="status" role="status"></p>
+    </section>
   </section>
 
-  <section id="result" hidden>
-    <h2>Orden sugerido</h2>
-    <div class="rhythm" id="rhythm" title="Ritmo de la pauta"></div>
-    <ol id="list"></ol>
-    <div class="row">
-      <button class="ghost" id="copy">Copiar lista</button>
-      <button class="ghost" id="openNext">Abrir siguiente ↗</button>
+  <!-- Vista pauta: #/pauta/<id> -->
+  <section id="viewPauta" hidden>
+    <div class="p-bar">
+      <a class="back" id="back" href="#/">← Volver</a>
+      <span class="p-bar-title" id="pBarTitle"></span>
     </div>
+    <h2 id="pTitle">Orden sugerido</h2>
+    <p class="p-meta" id="pMeta"></p>
+    <p class="p-crit" id="pCrit" hidden><b>Indicación:</b> <span></span></p>
+    <div class="rhythm" id="rhythm" title="Ritmo de la pauta"></div>
+    <div class="toolbar" id="toolbar">
+      <button id="openNext">Abrir siguiente ↗</button>
+      <button class="ghost" id="copy">Copiar lista</button>
+      <span id="pStatus" class="status" role="status"></span>
+    </div>
+    <ol id="list" class="plist"></ol>
   </section>
 </main>
 
 <script>
   const $ = (id) => document.getElementById(id);
   const colors = { gracioso: "var(--fun)", serio: "var(--serious)", neutro: "var(--neutral)" };
+  const TONOS = ["gracioso", "serio", "neutro"];
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
   let current = null; // pauta abierta: { id, createdAt, updatedAt, criterio, items }
   let items = []; // = current.items (orden actual)
+  let view = null; // "inicio" | "pauta"
+  let cameFromInicio = false; // para que "Volver" use history.back() y no apile entradas
+  let busy = false; // POST /api/ordenar en curso
 
   try { $("texto").value = localStorage.getItem("pauta:texto") || ""; } catch {}
   $("texto").addEventListener("input", () => { try { localStorage.setItem("pauta:texto", $("texto").value); } catch {} });
 
-  function status(msg, err = false) { $("status").textContent = msg; $("status").className = err ? "err" : ""; }
+  // Escribe en la línea de estado de la vista visible.
+  function status(msg, err = false) {
+    const el = view === "pauta" ? $("pStatus") : $("status");
+    el.textContent = msg;
+    el.classList.toggle("err", err);
+  }
 
   async function api(path, opts = {}) {
-    const r = await fetch(path, opts.body ? { ...opts, headers: { "content-type": "application/json" } } : opts);
+    let r;
+    try {
+      r = await fetch(path, opts.body ? { ...opts, headers: { "content-type": "application/json" } } : opts);
+    } catch {
+      throw new Error("No pude conectar con el servidor.");
+    }
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
+    if (!r.ok) throw Object.assign(new Error(data.error || `Error ${r.status}`), { status: r.status });
     return data;
   }
 
@@ -122,19 +196,73 @@
     return `${p.weekday} ${p.day} ${p.month}, ${hora}`;
   }
 
+  /* ---------- Router (hash) ---------- */
+
+  function parseHash() {
+    const m = location.hash.match(/^#\/pauta\/([^/?#]+)$/);
+    return m ? { view: "pauta", id: decodeURIComponent(m[1]) } : { view: "inicio" };
+  }
+
+  function showView(name) {
+    const prev = view;
+    view = name;
+    $("viewInicio").hidden = name !== "inicio";
+    $("viewPauta").hidden = name !== "pauta";
+    if (prev === name) return;
+    cameFromInicio = prev === "inicio" && name === "pauta";
+    const el = name === "pauta" ? $("viewPauta") : $("viewInicio");
+    el.classList.remove("view-enter");
+    void el.offsetWidth; // reinicia la animación de entrada
+    el.classList.add("view-enter");
+    window.scrollTo(0, 0);
+    document.title = name === "pauta" && current ? `Pauta del ${fecha(current.createdAt)}` : "Pauta editorial";
+    if (name === "inicio") loadHistory();
+  }
+
+  let routeSeq = 0;
+  async function route() {
+    const r = parseHash();
+    const seq = ++routeSeq;
+    if (r.view === "inicio") return showView("inicio");
+    if (!current || current.id !== r.id) {
+      try {
+        const { pauta } = await api(`api/pautas/${encodeURIComponent(r.id)}`);
+        if (seq !== routeSeq) return; // el usuario ya navegó a otra parte
+        setPauta(pauta);
+      } catch (e) {
+        if (seq !== routeSeq) return;
+        history.replaceState(null, "", "#/");
+        showView("inicio");
+        status(e.status === 404 || e.status === 400 ? "Esa pauta no existe (¿la borraste?)." : e.message, true);
+        return;
+      }
+    }
+    showView("pauta");
+  }
+
+  function goPauta(id) { location.hash = `#/pauta/${encodeURIComponent(id)}`; }
+
+  $("back").addEventListener("click", (e) => {
+    // Si llegamos desde el inicio, volver atrás en el historial evita apilar entradas.
+    if (cameFromInicio) { e.preventDefault(); history.back(); }
+  });
+
+  window.addEventListener("hashchange", route);
+
+  /* ---------- Vista pauta ---------- */
+
   function setPauta(pauta) {
     current = pauta;
     items = pauta ? pauta.items : [];
-    render();
-    document.querySelectorAll(".h-item").forEach((el) => el.classList.toggle("active", !!current && el.dataset.id === current.id));
+    if (pauta) renderPauta();
   }
 
-  // Guarda en el servidor qué links ya se abrieron (fire-and-forget).
+  // Guarda en el servidor qué links ya se abrieron (fire-and-forget; el historial espera a que termine).
+  let saving = Promise.resolve();
   function saveDone() {
     if (!current) return;
     const done = items.filter((it) => it.done).map((it) => it.id);
-    api(`api/pautas/${current.id}`, { method: "PUT", body: JSON.stringify({ done }) })
-      .then(() => loadHistory())
+    saving = api(`api/pautas/${current.id}`, { method: "PUT", body: JSON.stringify({ done }) })
       .catch((e) => console.warn("No pude guardar los vistos:", e));
   }
 
@@ -142,62 +270,86 @@
     if (it.done) return;
     it.done = true;
     saveDone();
+    renderHeader();
   }
 
-  function render() {
-    $("list").innerHTML = "";
-    $("rhythm").innerHTML = "";
+  function renderHeader() {
+    const doneCount = items.filter((it) => it.done).length;
+    $("pBarTitle").textContent = fecha(current.createdAt);
+    $("pTitle").textContent = `Pauta del ${fecha(current.createdAt)}`;
+    $("pMeta").textContent = `${items.length} links · ${doneCount}/${items.length} vistos`;
+    $("pCrit").hidden = !current.criterio;
+    $("pCrit").querySelector("span").textContent = current.criterio || "";
+  }
+
+  // Dibuja la barra de ritmo y la lista en el orden de `items`.
+  function renderList() {
+    $("list").replaceChildren();
+    $("rhythm").replaceChildren();
     items.forEach((it, i) => {
       const li = document.createElement("li");
       li.className = it.tono + (it.done ? " done" : "");
-      li.innerHTML = `<div class="n">${i + 1}</div><div class="t"><a target="_blank" rel="noopener noreferrer"></a><div class="meta"></div></div><span class="tag"></span>`;
+      li.dataset.id = it.id;
+      li.innerHTML = `<div class="n"></div><div class="t"><a target="_blank" rel="noopener noreferrer"></a><div class="meta"></div></div><span class="tag"></span>`;
+      li.querySelector(".n").textContent = i + 1;
       const a = li.querySelector("a");
       a.href = it.url;
-      a.textContent = it.title;
+      a.textContent = it.title || it.url;
       a.addEventListener("click", () => { markDone(it); li.classList.add("done"); });
       li.querySelector(".meta").textContent = `${it.domain} · ${it.motivo}`;
       li.querySelector(".tag").textContent = it.tono;
       $("list").appendChild(li);
       const bar = document.createElement("span");
-      bar.style.background = colors[it.tono];
+      bar.style.background = colors[it.tono] || colors.neutro;
       $("rhythm").appendChild(bar);
     });
-    $("result").hidden = items.length === 0;
   }
+
+  function renderPauta() {
+    renderHeader();
+    renderList();
+    $("pStatus").textContent = "";
+    $("pStatus").classList.remove("err");
+  }
+
+  $("copy").addEventListener("click", async () => {
+    const txt = items.map((it, i) => `${i + 1}. ${it.title}\n${it.url}`).join("\n\n");
+    try { await navigator.clipboard.writeText(txt); status("Lista copiada."); } catch { status("No pude copiar.", true); }
+  });
+
+  $("openNext").addEventListener("click", () => {
+    const it = items.find((x) => !x.done);
+    if (!it) return status("Ya abriste todos.");
+    window.open(it.url, "_blank", "noopener");
+    markDone(it);
+    renderList();
+  });
+
+  /* ---------- Historial (vista inicio) ---------- */
 
   async function loadHistory() {
     let pautas;
     try {
+      await saving;
       ({ pautas } = await api("api/pautas"));
     } catch (e) {
       console.warn("No pude cargar el historial:", e);
       return;
     }
     const list = $("historyList");
-    list.innerHTML = "";
+    list.replaceChildren();
     $("historyEmpty").hidden = pautas.length > 0;
     for (const p of pautas) {
       const row = document.createElement("div");
-      row.className = "h-item" + (current && current.id === p.id ? " active" : "");
+      row.className = "h-item";
       row.dataset.id = p.id;
       row.innerHTML = `<button class="h-open"><span class="h-date"></span><span class="h-meta"></span><span class="h-prev"></span></button><button class="h-del" title="Borrar" aria-label="Borrar pauta">×</button>`;
       row.querySelector(".h-date").textContent = fecha(p.createdAt);
       row.querySelector(".h-meta").textContent = `${p.count} links · ${p.doneCount}/${p.count} vistos`;
       row.querySelector(".h-prev").textContent = p.preview[0] || "";
-      row.querySelector(".h-open").addEventListener("click", () => openPauta(p.id));
+      row.querySelector(".h-open").addEventListener("click", () => goPauta(p.id));
       row.querySelector(".h-del").addEventListener("click", () => removePauta(p));
       list.appendChild(row);
-    }
-  }
-
-  async function openPauta(id) {
-    try {
-      const { pauta } = await api(`api/pautas/${id}`);
-      setPauta(pauta);
-      status(`Pauta del ${fecha(pauta.createdAt)}`);
-      $("result").scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (e) {
-      status(e.message, true);
     }
   }
 
@@ -212,45 +364,161 @@
     }
   }
 
+  /* ---------- Animación "armando": una lista que se reordena ---------- */
+
+  const shuffler = { timer: null };
+
+  // Títulos aproximados desde el texto pegado: líneas sin URLs ni viñetas.
+  function guessTitles(texto) {
+    const seen = new Set();
+    const out = [];
+    for (const line of texto.split(/\r?\n/)) {
+      const t = line.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/https?:\/\/\S+/gi, " ")
+        .replace(/^\s*(?:[-*•▪►→]|\d+[.)-]|#)\s*/, "").replace(/\s+/g, " ").trim();
+      if (t.length < 3 || seen.has(t)) continue;
+      seen.add(t);
+      out.push(t);
+    }
+    return out;
+  }
+
+  const rand = (n) => Math.floor(Math.random() * n);
+  function shuffled(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+
+  function setTone(card, tono) {
+    card.classList.remove(...TONOS);
+    card.classList.add(tono);
+    card.querySelector(".tag").textContent = tono;
+  }
+
+  function buildCards(texto) {
+    const box = $("shuffle");
+    box.replaceChildren();
+    const titles = shuffled(guessTitles(texto)).slice(0, 7);
+    while (titles.length < 7) titles.push(null); // relleno con barras genéricas
+    for (const title of titles) {
+      const card = document.createElement("div");
+      card.className = "sc";
+      card.innerHTML = `<span class="sc-grip">⋮⋮</span><span class="tag"></span>`;
+      const body = document.createElement("span");
+      if (title) { body.className = "sc-t"; body.textContent = title; }
+      else { body.className = "sc-bar"; body.style.maxWidth = `${45 + rand(45)}%`; }
+      card.insertBefore(body, card.lastChild);
+      setTone(card, TONOS[rand(3)]);
+      box.appendChild(card);
+    }
+  }
+
+  // FLIP: mide, reordena el DOM y anima cada tarjeta desde su posición anterior.
+  function flip(box, mutate, lifted) {
+    const kids = [...box.children];
+    const first = new Map(kids.map((k) => [k, k.getBoundingClientRect().top]));
+    mutate();
+    for (const k of kids) {
+      const dy = first.get(k) - k.getBoundingClientRect().top;
+      if (!dy) continue;
+      const lift = lifted.includes(k);
+      const frames = lift
+        ? [{ transform: `translateY(${dy}px)` }, { transform: `translateY(${dy / 2}px) scale(1.035)`, offset: 0.5 }, { transform: "none" }]
+        : [{ transform: `translateY(${dy}px)` }, { transform: "none" }];
+      if (lift) k.classList.add("lift");
+      const anim = k.animate(frames, { duration: lift ? 620 : 520, easing: "cubic-bezier(.2,.75,.25,1)" });
+      if (lift) anim.finished.then(() => k.classList.remove("lift"), () => k.classList.remove("lift"));
+    }
+  }
+
+  function shuffleStep() {
+    const box = $("shuffle");
+    const kids = [...box.children];
+    const n = kids.length;
+    if (!reduceMotion.matches && n > 2) {
+      if (Math.random() < 0.6) {
+        // Saca una tarjeta y la mete más arriba o más abajo.
+        const i = rand(n);
+        let j = rand(n);
+        while (Math.abs(j - i) < 2) j = rand(n);
+        const card = kids[i];
+        flip(box, () => box.insertBefore(card, j > i ? kids[j].nextSibling : kids[j]), [card]);
+      } else {
+        // Intercambia dos tarjetas.
+        const i = rand(n);
+        let j = rand(n);
+        while (j === i) j = rand(n);
+        const a = kids[i], b = kids[j];
+        flip(box, () => {
+          const nextA = a.nextSibling;
+          if (nextA === b) return box.insertBefore(b, a);
+          box.insertBefore(a, b);
+          box.insertBefore(b, nextA);
+        }, [a, b]);
+      }
+    }
+    // A veces una tarjeta "se reclasifica".
+    if (Math.random() < 0.4) {
+      const card = kids[rand(n)];
+      setTone(card, TONOS.filter((t) => !card.classList.contains(t))[rand(2)]);
+    }
+  }
+
+  function startShuffle(texto) {
+    buildCards(texto);
+    stopShuffle();
+    shuffler.timer = setInterval(shuffleStep, reduceMotion.matches ? 1600 : 800);
+  }
+
+  function stopShuffle() {
+    clearInterval(shuffler.timer);
+    shuffler.timer = null;
+    $("shuffle").getAnimations?.({ subtree: true }).forEach((a) => a.cancel());
+  }
+
+  function showArmando(on) {
+    $("form").hidden = on;
+    $("armando").hidden = !on;
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- Armar pauta ---------- */
+
   $("go").addEventListener("click", async () => {
+    if (busy) return;
     const texto = $("texto").value.trim();
     if (!texto) return status("Pega la lista primero.", true);
+    busy = true;
     $("go").disabled = true;
+    status("");
     const t0 = Date.now();
     const n = (texto.match(/https?:\/\//g) || []).length;
-    const tick = () => status(`Armando la pauta de ${n} links… ${Math.round((Date.now() - t0) / 1000)} s (suele tardar ~1 min)`);
+    const tick = () => { $("armandoStatus").textContent = `Armando la pauta de ${n} links… ${Math.round((Date.now() - t0) / 1000)} s (suele tardar ~1 min)`; };
     tick();
     const timer = setInterval(tick, 1000);
+    startShuffle(texto);
+    showArmando(true);
     try {
       const data = await api("api/ordenar", {
         method: "POST",
         body: JSON.stringify({ texto, criterio: $("criterio").value.trim() }),
       });
       setPauta(data.pauta);
-      status(`${items.length} links ordenados en ${((Date.now() - t0) / 1000).toFixed(1)} s`);
-      loadHistory();
+      showArmando(false);
+      goPauta(data.pauta.id);
+      $("pStatus").textContent = `${items.length} links ordenados en ${((Date.now() - t0) / 1000).toFixed(1)} s`;
     } catch (e) {
+      showArmando(false);
       status(e.message, true);
     } finally {
       clearInterval(timer);
+      stopShuffle();
+      busy = false;
       $("go").disabled = false;
     }
   });
 
-  $("copy").addEventListener("click", async () => {
-    const txt = items.map((it, i) => `${i + 1}. ${it.title}\n${it.url}`).join("\n\n");
-    try { await navigator.clipboard.writeText(txt); status("Lista copiada."); } catch { status("No pude copiar.", true); }
-  });
-
-  $("openNext").addEventListener("click", () => {
-    const it = items.find((x) => !x.done);
-    if (!it) return status("Ya abriste todos.");
-    window.open(it.url, "_blank", "noopener");
-    markDone(it);
-    render();
-  });
-
-  loadHistory();
+  route();
 </script>
 </body>
 </html>
