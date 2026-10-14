@@ -1,7 +1,15 @@
 # news-radar
-News radar for politics. Scrapes different sources, crosses them, selects and classifies most relevant news, and labels them in search for fake news, not checked and checked news. 
 
-## Módulos
+A news radar for politics: scrape multiple sources, cross-reference them, pick and classify the most
+relevant stories, and label them as checked, unchecked or likely fake.
 
-- [`pauta/`](pauta/): **Pauta editorial**. Pegas los links del día y Claude los ordena intercalando notas graciosas y serias para retener a la audiencia de la transmisión.
-- Raíz y `pendiente/`: experimentos de scraping de medios chilenos (requests `.http` y `test_biobio.py`).
+## Modules
+
+- [`pauta/`](pauta/) **Pauta editorial**: paste the day's links and Claude orders them for a live
+  stream, alternating funny and serious stories to keep the audience watching.
+- Repository root and `pendiente/`: scraping experiments against Chilean news outlets
+  (`.http` requests and `test_biobio.py`).
+
+## License
+
+[MIT](LICENSE)

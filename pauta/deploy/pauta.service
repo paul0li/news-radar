@@ -1,5 +1,5 @@
 [Unit]
-Description=Pauta editorial (news-radar) — solo tailnet vía tailscale serve
+Description=Pauta editorial (news-radar)
 After=network-online.target tailscaled.service
 Wants=network-online.target
 

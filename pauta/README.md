@@ -1,75 +1,88 @@
 # 📡 Pauta editorial
 
-Primer módulo de **news-radar**. Pegas los ~40 links del día
-(título + link, en cualquier formato) y Claude los ordena **intercalando notas graciosas y serias**
-para que la audiencia no abandone la transmisión. Devuelve la lista con links que se abren en una pestaña nueva.
+A tiny web app for live-stream hosts who comment on links. Paste the day's list (~40 links from news
+sites, social media, videos; title + URL in almost any format) and Claude returns a running order that
+**alternates funny and serious stories** so viewers don't drop off. Every link opens in a new tab.
 
-- Un solo HTML sin librerías + un servidor Node **sin dependencias**.
-- Usa **Claude Code** (`claude -p`) con tu suscripción: no necesita API key. Es para uso personal.
-- Claude solo devuelve **ids**, tono y motivo: los links salen de tu lista original, así que nunca inventa ni altera URLs.
-  Si omite o duplica alguno, el servidor lo corrige (los faltantes van al final).
+- One HTML file with no libraries, plus a Node server with **zero dependencies**.
+- Calls **Claude Code** in headless mode (`claude -p`), so it runs on your Claude subscription with no
+  API key. It is meant for personal use.
+- Claude only returns **ids**, a tone and a one-line reason. URLs always come from your original list,
+  so they can never be invented or altered. Missing or duplicated ids are fixed server-side
+  (anything missing goes at the end).
 
-## Correr local
+> The UI and the editorial prompt are in Spanish, since the app was built for a Chilean stream.
 
-Requiere Node ≥ 20 y Claude Code instalado y con sesión iniciada (`claude` funcionando en la terminal).
+## Run locally
+
+Requires Node ≥ 20 and [Claude Code](https://code.claude.com) installed and logged in.
 
 ```bash
 npm run dev            # http://localhost:3000
 ```
 
-## Deploy (instancia Hermes o cualquier VPS)
+## Deploy
 
-En el servidor, con Node ≥ 20 y Claude Code instalado:
+On any Linux server with Node ≥ 20 and Claude Code installed:
 
 ```bash
-claude setup-token     # genera un token de tu suscripción (válido ~1 año)
+claude setup-token     # creates a long-lived token for your subscription
 git clone https://github.com/paul0li/news-radar.git && cd news-radar/pauta
-CLAUDE_CODE_OAUTH_TOKEN=... APP_PASSWORD=algo node server.js
+CLAUDE_CODE_OAUTH_TOKEN=... APP_PASSWORD=change-me node server.js
 ```
 
-Si en esa máquina ya hiciste `claude` → login, no necesitas el token.
+If you already ran `claude` and logged in on that machine, you can skip the token.
 
-O con Docker (trae Claude Code incluido):
+Or with Docker (Claude Code is installed in the image):
 
 ```bash
 docker build -t pauta .
 docker run -d --restart unless-stopped -p 3000:3000 \
-  -e CLAUDE_CODE_OAUTH_TOKEN=... -e APP_PASSWORD=algo pauta
+  -e CLAUDE_CODE_OAUTH_TOKEN=... -e APP_PASSWORD=change-me pauta
 ```
 
-### Hermes (instalación actual)
+`GET /healthz` returns `ok` without auth.
 
-**https://hermes-instance.taile1b659.ts.net**: solo accesible desde dispositivos de la tailnet; no hay clave
-porque estar en Tailscale ya es la autenticación.
+### Private deploy with Tailscale and auto-deploy
 
-- App: servicio systemd [`deploy/pauta.service`](deploy/pauta.service) en `127.0.0.1:3010`.
-- HTTPS: `tailscale serve` (certificado automático, persiste entre reinicios):
-  `sudo tailscale serve --bg --https=443 http://127.0.0.1:3010`
-- Variables (incluido el token) en `~/.config/pauta/pauta.env`, fuera de la repo.
+This is how the reference instance runs. It is only reachable from devices on the owner's tailnet,
+so it needs no password:
 
-Deploy automático: `~/news-radar` en Hermes es un clon de esta repo y un cron corre
-[`deploy/autodeploy.sh`](deploy/autodeploy.sh) cada minuto. **Todo lo que llegue a `main` queda
-desplegado en ~1 minuto** (log en `~/news-radar-deploy.log`). Para pausarlo:
-`touch ~/.news-radar-autodeploy-paused`.
+1. Run the app as a systemd service bound to localhost: [`deploy/pauta.service`](deploy/pauta.service),
+   with its variables (`HOST=127.0.0.1`, `PORT=3010`, the token) in an env file outside the repo.
+2. Expose it to the tailnet over HTTPS (certificate handled by Tailscale, persists across reboots):
+   ```bash
+   sudo tailscale serve --bg --https=443 http://127.0.0.1:3010
+   ```
+3. Deploy whatever lands on `main`: a cron job runs [`deploy/autodeploy.sh`](deploy/autodeploy.sh)
+   every minute. When `origin/main` moves, it resets the checkout, updates the systemd unit if it
+   changed, restarts the service and checks `/healthz`. A failed deploy is retried on the next run.
+   ```cron
+   * * * * * /path/to/news-radar/pauta/deploy/autodeploy.sh >> ~/news-radar-deploy.log 2>&1
+   ```
+   Pause it with `touch ~/.news-radar-autodeploy-paused`. Adjust the paths at the top of the
+   script and in the unit file to match your server.
 
-En otro servidor: ponle delante el reverse proxy que ya tenga la instancia (Caddy/nginx) para HTTPS. `GET /healthz` responde `ok` sin auth.
+To expose it publicly instead, put a reverse proxy with HTTPS (nginx, Caddy) in front and set
+`APP_PASSWORD`, since every request spends your Claude usage.
 
-## Variables de entorno
+## Configuration
 
-| Variable | Default | Para qué |
+| Variable | Default | Purpose |
 |---|---|---|
-| `CLAUDE_CODE_OAUTH_TOKEN` | — | Token de `claude setup-token`. No hace falta si la máquina ya tiene sesión de Claude Code. |
-| `APP_PASSWORD` | vacío | Si se define, el navegador pide clave (Basic Auth, cualquier usuario). Recomendado si queda expuesta: usa tu cuota de Claude. |
-| `MODEL` | `opus` | Modelo para `claude --model` (`opus`, `sonnet`, `haiku` o un id completo). |
-| `EFFORT` | `low` | `low`/`medium`/`high`. Ordenar 40 títulos no necesita más que `low`. |
-| `CLAUDE_BIN` | `claude` | Ruta al ejecutable si no está en el `PATH`. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | — | Token from `claude setup-token`. Not needed if the machine already has a Claude Code login. |
+| `APP_PASSWORD` | empty | When set, the browser asks for a password (Basic Auth, any username). Recommended for public deployments. |
+| `MODEL` | `opus` | Passed to `claude --model` (`opus`, `sonnet`, `haiku` or a full model id). |
+| `EFFORT` | `low` | `low` / `medium` / `high`. Ordering ~40 titles doesn't need more than `low`. |
+| `CLAUDE_BIN` | `claude` | Path to the Claude Code binary if it isn't on `PATH`. |
+| `HOST` | `0.0.0.0` | Interface to listen on. Use `127.0.0.1` behind a proxy or `tailscale serve`. |
 | `PORT` | `3000` | |
-| `HOST` | `0.0.0.0` | Interfaz donde escucha. En Hermes: la IP de Tailscale, para que solo se vea dentro de la tailnet. |
 
-## Ajustar el criterio editorial
+## Tuning the editorial rules
 
-Las reglas (abrir con gancho, máx. 2 serios seguidos, no burlarse cerca de una tragedia, etc.) están en
-`SYSTEM` dentro de [`server.js`](server.js). En la UI también hay un campo de "indicación extra" para el día.
+The rules (open with a hook, never more than two serious stories in a row, no jokes right next to a
+tragedy, and so on) live in the `SYSTEM` prompt in [`server.js`](server.js). The UI also has an
+optional "extra instruction" field for the day.
 
 ## Tests
 
