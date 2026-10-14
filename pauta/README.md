@@ -39,9 +39,15 @@ docker run -d --restart unless-stopped -p 3000:3000 \
 
 ### Hermes (instalación actual)
 
-**https://news-radar.paul0li.tech**: nginx + certbot → `127.0.0.1:3010`, servicio systemd
-[`deploy/pauta.service`](deploy/pauta.service), sitio [`deploy/nginx-news-radar.paul0li.tech.conf`](deploy/nginx-news-radar.paul0li.tech.conf).
-Variables (token y clave incluidos) en `~/.config/pauta/pauta.env`, fuera de la repo.
+**https://hermes-instance.taile1b659.ts.net**: solo accesible desde dispositivos de la tailnet; no hay clave
+porque estar en Tailscale ya es la autenticación.
+
+- App: servicio systemd [`deploy/pauta.service`](deploy/pauta.service) en `127.0.0.1:3010`.
+- HTTPS: `tailscale serve` (certificado automático, persiste entre reinicios):
+  `sudo tailscale serve --bg --https=443 http://127.0.0.1:3010`
+- Variables (incluido el token) en `~/.config/pauta/pauta.env`, fuera de la repo.
+
+Actualizar:
 
 ```bash
 rsync -a --delete --exclude node_modules --exclude .env pauta/ hermes-ts:news-radar/pauta/
