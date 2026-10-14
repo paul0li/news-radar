@@ -98,7 +98,7 @@
   .p-end-t { font: 700 22px Georgia, serif; margin: 0 0 6px; }
   .p-end .status { margin: 0 0 14px; }
   .plist { list-style: none; padding: 0; margin: 0; }
-  .plist > li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: start; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--neutral); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .plist > li { display: grid; grid-template-columns: 28px 30px minmax(0, 1fr) auto; gap: 10px; align-items: start; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--neutral); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
   .plist > li.gracioso { border-left-color: var(--fun); }
   .plist > li.serio { border-left-color: var(--serious); }
   .plist > li.done { opacity: .45; }
@@ -107,9 +107,24 @@
   .plist .t a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
   .plist .t a:hover { text-decoration: underline; }
   .plist .meta { font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+  /* Reordenar: se arrastra solo desde el ⋮⋮ (el resto de la fila sigue haciendo scroll y abriendo links) */
+  .grip { display: flex; align-items: center; justify-content: center; width: 40px; height: 44px; margin: -10px 0 -10px -12px; padding: 0; border-radius: 6px; background: transparent; color: var(--muted); font: 700 15px system-ui, sans-serif; letter-spacing: -2px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  .grip:hover { color: var(--ink); background: var(--neutral-bg); }
+  .grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .plist.is-dragging { user-select: none; -webkit-user-select: none; }
+  .plist.is-dragging a { pointer-events: none; }
+  .plist.is-dragging > li:not(.dragging) { transition: transform .2s cubic-bezier(.2, .75, .25, 1); }
+  .plist > li.dragging, .plist > li.settling { position: relative; z-index: 3; box-shadow: 0 10px 28px var(--shadow); }
+  .plist > li.dragging .grip { cursor: grabbing; color: var(--ink); }
+  body.grabbing, body.grabbing * { cursor: grabbing !important; }
+  .p-sub { justify-content: space-between; align-items: center; gap: 10px; }
+  .hint { color: var(--muted); font-size: 12px; }
+  @media (prefers-reduced-motion: reduce) {
+    .plist.is-dragging > li:not(.dragging) { transition: none; }
+  }
   @media (max-width: 420px) {
-    .plist > li { grid-template-columns: 24px minmax(0, 1fr); }
-    .plist > li .tag { grid-column: 2; justify-self: start; }
+    .plist > li { grid-template-columns: 28px 24px minmax(0, 1fr); gap: 8px; }
+    .plist > li .tag { grid-column: 3; justify-self: start; }
   }
 </style>
 </head>
@@ -163,7 +178,7 @@
       <button class="ghost" id="reset">Reiniciar</button>
       <span id="pStatus" class="status" role="status"></span>
     </div>
-    <div class="p-sub"><button class="linkish" id="toggleDone" hidden></button></div>
+    <div class="p-sub"><span class="hint" id="dragHint" hidden>Arrastra ⋮⋮ para mover</span><span></span><button class="linkish" id="toggleDone" hidden></button></div>
     <ol id="list" class="plist"></ol>
     <div class="p-end" id="pEnd" hidden>
       <p class="p-end-t">¡Pauta terminada! 🎉</p>
@@ -280,32 +295,40 @@
   let showDone = false;
   try { showDone = localStorage.getItem("pauta:mostrarVistos") === "1"; } catch {}
 
-  // Guarda en el servidor qué links ya se abrieron. Siempre manda el set completo de vistos y
-  // los envíos de una misma pauta van uno tras otro: si hay cambios mientras uno está en vuelo,
-  // al terminar se manda el estado local más reciente. La respuesta nunca pisa el estado local.
-  // `saving` es la promesa que el historial espera antes de recargar.
+  // Guarda en el servidor los cambios de la pauta (qué links ya se abrieron y/o el orden).
+  // Los envíos de una misma pauta van uno tras otro: si hay cambios mientras uno está en vuelo,
+  // al terminar se manda el estado local más reciente de todo lo pendiente (`done` y/o `order`
+  // en un solo PUT). La respuesta nunca pisa el estado local; lo que falla se reintenta junto
+  // con el próximo cambio. `saving` es la promesa que el historial espera antes de recargar.
   let saving = Promise.resolve();
   let saveError = false;
-  function saveDone() {
+  function queueSave(what) {
     const p = current;
     if (!p) return saving;
-    p._dirty = true;
+    p._dirty = { ...p._retry, ...p._dirty, ...what };
+    p._retry = null;
     if (!p._flush) {
       p._flush = (async () => {
         try {
           while (p._dirty) {
-            p._dirty = false;
-            const done = p.items.filter((it) => it.done).map((it) => it.id);
+            const d = p._dirty;
+            p._dirty = null;
+            const body = {};
+            if (d.order) body.order = p.items.map((it) => it.id);
+            if (d.done) body.done = p.items.filter((it) => it.done).map((it) => it.id);
             try {
-              await api(`api/pautas/${encodeURIComponent(p.id)}`, { method: "PUT", body: JSON.stringify({ done }) });
+              await api(`api/pautas/${encodeURIComponent(p.id)}`, { method: "PUT", body: JSON.stringify(body) });
               if (saveError && !p._dirty) {
                 saveError = false;
                 if (view === "pauta" && current === p) status("Guardado.");
               }
             } catch (e) {
-              console.warn("No pude guardar los vistos:", e);
+              console.warn("No pude guardar la pauta:", e);
               saveError = true;
-              if (view === "pauta" && current === p) status(`No pude guardar los vistos (${e.message.replace(/\.$/, "")}). Se reintenta en el próximo cambio.`, true);
+              if (p._dirty) p._dirty = { ...d, ...p._dirty }; // ya hay otro cambio: va todo junto
+              else p._retry = { ...p._retry, ...d };
+              const que = d.order ? (d.done ? "los cambios" : "el nuevo orden") : "los vistos";
+              if (view === "pauta" && current === p) status(`No pude guardar ${que} (${e.message.replace(/\.$/, "")}). Se reintenta en el próximo cambio.`, true);
             }
           }
         } finally {
@@ -316,6 +339,8 @@
     }
     return saving;
   }
+  const saveDone = () => queueSave({ done: true });
+  const saveOrder = () => queueSave({ order: true });
 
   const doneCount = () => items.filter((it) => it.done).length;
 
@@ -358,6 +383,7 @@
   // Dibuja la barra de ritmo y la lista en el orden de `items`. Los vistos se omiten salvo con
   // "Mostrar vistos"; cada link conserva su número en la pauta completa (índice en `items` + 1).
   function renderList() {
+    if (drag) endDrag(false);
     renderRhythm();
     $("list").replaceChildren();
     items.forEach((it, i) => {
@@ -365,7 +391,7 @@
       const li = document.createElement("li");
       li.className = it.tono + (it.done ? " done" : "");
       li.dataset.id = it.id;
-      li.innerHTML = `<div class="n"></div><div class="t"><a target="_blank" rel="noopener noreferrer"></a><div class="meta"></div></div><span class="tag"></span>`;
+      li.innerHTML = `<button type="button" class="grip" aria-label="Mover">⋮⋮</button><div class="n"></div><div class="t"><a target="_blank" rel="noopener noreferrer"></a><div class="meta"></div></div><span class="tag"></span>`;
       li.querySelector(".n").textContent = i + 1;
       const a = li.querySelector("a");
       a.href = it.url;
@@ -376,8 +402,209 @@
       a.addEventListener("auxclick", (e) => { if (e.button === 1) opened(); });
       li.querySelector(".meta").textContent = `${it.domain} · ${it.motivo}`;
       li.querySelector(".tag").textContent = it.tono;
+      const grip = li.querySelector(".grip");
+      grip.title = "Arrastra para mover (o usa ↑ ↓)";
+      grip.addEventListener("pointerdown", (e) => startDrag(e, li));
+      grip.addEventListener("keydown", (e) => moveByKey(e, li));
       $("list").appendChild(li);
     });
+    renderHint();
+  }
+
+  /* ---------- Reordenar: arrastrar el ⋮⋮ (mouse y touch) o flechas con el ⋮⋮ enfocado ---------- */
+
+  let dragHintSeen = false;
+  try { dragHintSeen = localStorage.getItem("pauta:arrastreVisto") === "1"; } catch {}
+  function renderHint() {
+    $("dragHint").hidden = dragHintSeen || $("list").children.length < 2;
+  }
+
+  // Números de cada fila = posición en la pauta completa (incluye los vistos ocultos).
+  function renumber() {
+    const pos = new Map(items.map((it, i) => [String(it.id), i + 1]));
+    for (const li of $("list").children) li.querySelector(".n").textContent = pos.get(li.dataset.id);
+  }
+
+  // Nuevo orden completo a partir del orden visible del DOM: los ocultos (vistos) se quedan en su
+  // casilla de `items` y los visibles ocupan las casillas restantes en su nuevo orden.
+  function applyDomOrder() {
+    const byId = new Map(items.map((it) => [String(it.id), it]));
+    const visible = [...$("list").children].map((li) => byId.get(li.dataset.id)).filter(Boolean);
+    const inDom = new Set(visible);
+    let k = 0;
+    const next = items.map((it) => (inDom.has(it) ? visible[k++] : it));
+    if (next.every((it, i) => it === items[i])) return false;
+    current.items = items = next;
+    saveOrder();
+    renumber();
+    renderRhythm();
+    renderHeader();
+    if (!dragHintSeen) {
+      dragHintSeen = true;
+      try { localStorage.setItem("pauta:arrastreVisto", "1"); } catch {}
+      renderHint();
+    }
+    return true;
+  }
+
+  let drag = null;
+
+  function startDrag(e, li) {
+    if (drag || (e.pointerType === "mouse" && e.button !== 0)) return;
+    const list = $("list");
+    if (list.querySelector(".leaving")) {
+      // Termina de golpe los links que se estaban plegando y arrastra la fila recién dibujada.
+      renderList();
+      li = list.querySelector(`li[data-id="${li.dataset.id}"]`);
+      if (!li) return;
+    }
+    const grip = li.querySelector(".grip");
+    const rows = [...list.children].map((el) => {
+      const r = el.getBoundingClientRect();
+      return { el, top: r.top + scrollY, h: r.height };
+    });
+    const from = rows.findIndex((r) => r.el === li);
+    const me = rows[from];
+    const last = rows[rows.length - 1];
+    drag = {
+      li, grip, rows, from, to: from, id: e.pointerId,
+      y0: e.clientY, sy0: scrollY, y: e.clientY, sy: scrollY, dy: 0,
+      slot: me.h + parseFloat(getComputedStyle(li).marginBottom || 0),
+      min: rows[0].top - me.top, max: last.top + last.h - (me.top + me.h),
+      raf: 0,
+    };
+    try { grip.setPointerCapture(e.pointerId); } catch {}
+    grip.addEventListener("pointermove", onDragMove);
+    grip.addEventListener("pointerup", onDragUp);
+    grip.addEventListener("pointercancel", onDragCancel);
+    grip.addEventListener("lostpointercapture", onDragCancel);
+    document.addEventListener("keydown", onDragKey, true);
+    list.classList.add("is-dragging");
+    document.body.classList.add("grabbing");
+    li.classList.add("dragging");
+    li.style.transform = "scale(1.02)";
+    drag.raf = requestAnimationFrame(dragFrame);
+  }
+
+  function onDragMove(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag.y = e.clientY;
+    e.preventDefault();
+  }
+  function onDragUp(e) { if (drag && e.pointerId === drag.id) endDrag(true); }
+  function onDragCancel(e) { if (drag && e.pointerId === drag.id) endDrag(false); }
+  function onDragKey(e) {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopPropagation();
+    endDrag(false);
+  }
+
+  // Un frame del arrastre: auto-scroll cerca de los bordes, mover la fila y abrir el hueco.
+  function dragFrame() {
+    if (!drag) return;
+    const d = drag;
+    const topEdge = Math.max(0, document.querySelector(".p-bar").getBoundingClientRect().bottom) + 48;
+    const bottomEdge = innerHeight - 48;
+    let speed = 0;
+    if (d.y < topEdge) speed = -Math.min(18, Math.ceil((topEdge - d.y) / 3));
+    else if (d.y > bottomEdge) speed = Math.min(18, Math.ceil((d.y - bottomEdge) / 3));
+    if (speed) scrollBy(0, speed);
+    const sy = scrollY;
+    const dy = Math.max(d.min, Math.min(d.max, d.y - d.y0 + (sy - d.sy0)));
+    if (dy !== d.dy || sy !== d.sy || !d.drawn) {
+      d.dy = dy;
+      d.sy = sy;
+      d.drawn = true;
+      d.li.style.transform = `translateY(${dy}px) scale(1.02)`;
+      const me = d.rows[d.from];
+      const center = me.top + dy + me.h / 2;
+      let to = 0;
+      d.rows.forEach((r, i) => { if (i !== d.from && r.top + r.h / 2 < center) to++; });
+      if (to !== d.to) {
+        d.to = to;
+        d.rows.forEach((r, i) => {
+          if (i === d.from) return;
+          let shift = 0;
+          if (d.from < to && i > d.from && i <= to) shift = -d.slot;
+          else if (to < d.from && i >= to && i < d.from) shift = d.slot;
+          r.el.style.transform = shift ? `translateY(${shift}px)` : "";
+        });
+      }
+    }
+    d.raf = requestAnimationFrame(dragFrame);
+  }
+
+  // Suelta (commit = true) o cancela (Escape / pointercancel) el arrastre.
+  function endDrag(commit) {
+    const d = drag;
+    if (!d) return;
+    drag = null;
+    cancelAnimationFrame(d.raf);
+    const { li, grip } = d;
+    grip.removeEventListener("pointermove", onDragMove);
+    grip.removeEventListener("pointerup", onDragUp);
+    grip.removeEventListener("pointercancel", onDragCancel);
+    grip.removeEventListener("lostpointercapture", onDragCancel);
+    document.removeEventListener("keydown", onDragKey, true);
+    try { if (grip.hasPointerCapture(d.id)) grip.releasePointerCapture(d.id); } catch {}
+    document.body.classList.remove("grabbing");
+    const list = $("list");
+    if (!li.isConnected) { list.classList.remove("is-dragging"); return; }
+    const animate = !reduceMotion.matches && li.animate;
+    const moved = commit && d.to !== d.from;
+    const before = li.getBoundingClientRect().top;
+    // Sin transición: las otras filas ya están visualmente donde quedan tras mover la del arrastre.
+    list.classList.remove("is-dragging");
+    li.classList.remove("dragging");
+    for (const r of d.rows) r.el.style.transform = "";
+    if (moved) {
+      const others = d.rows.filter((r) => r.el !== li).map((r) => r.el);
+      list.insertBefore(li, others[d.to] || null);
+      applyDomOrder();
+    } else if (animate && !commit) {
+      // Cancelado: las demás filas vuelven deslizándose a su lugar.
+      d.rows.forEach((r, i) => {
+        if (i === d.from) return;
+        let shift = 0;
+        if (d.from < d.to && i > d.from && i <= d.to) shift = -d.slot;
+        else if (d.to < d.from && i >= d.to && i < d.from) shift = d.slot;
+        if (shift) r.el.animate([{ transform: `translateY(${shift}px)` }, { transform: "none" }], { duration: 200, easing: "cubic-bezier(.2,.75,.25,1)" });
+      });
+    }
+    // La fila "se asienta" desde donde se soltó hasta su lugar final.
+    const delta = before - li.getBoundingClientRect().top;
+    if (animate && Math.abs(delta) > 0.5) {
+      li.classList.add("settling");
+      const anim = li.animate([{ transform: `translateY(${delta}px) scale(1.02)` }, { transform: "none" }],
+        { duration: 180, easing: "cubic-bezier(.2,.75,.25,1)" });
+      const off = () => li.classList.remove("settling");
+      anim.finished.then(off, off);
+    }
+  }
+
+  // Flechas ↑/↓ con el ⋮⋮ enfocado: mueve el link un lugar entre los visibles. Se mueve la fila
+  // vecina (no la enfocada) para que el foco se quede en este ⋮⋮.
+  function moveByKey(e, li) {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    if (drag || li.classList.contains("leaving")) return;
+    const up = e.key === "ArrowUp";
+    const other = up ? li.previousElementSibling : li.nextElementSibling;
+    if (!other || other.classList.contains("leaving")) return;
+    const list = $("list");
+    const pair = [li, other];
+    const first = pair.map((el) => el.getBoundingClientRect().top);
+    if (up) list.insertBefore(other, li.nextSibling);
+    else list.insertBefore(other, li);
+    if (!reduceMotion.matches && li.animate) {
+      pair.forEach((el, i) => {
+        const dy = first[i] - el.getBoundingClientRect().top;
+        if (dy) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: 160, easing: "cubic-bezier(.2,.75,.25,1)" });
+      });
+    }
+    applyDomOrder();
+    li.scrollIntoView({ block: "nearest" });
   }
 
   // Un link recién abierto: si se muestran los vistos solo se atenúa; si no, se pliega y desaparece.

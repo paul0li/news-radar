@@ -82,7 +82,8 @@ To expose it publicly instead, put a reverse proxy with HTTPS (nginx, Caddy) in 
 ## API
 
 Every pauta is saved on the server, so the UI can show a history and remember which links were
-already opened. All endpoints use the same auth as the page.
+already opened and any manual reordering (drag a row by its ⋮⋮ handle, or focus it and use ↑/↓).
+All endpoints use the same auth as the page.
 
 | Method & path | Body | Response |
 |---|---|---|
