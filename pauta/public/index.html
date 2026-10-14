@@ -27,7 +27,7 @@
   textarea { min-height: 220px; resize: vertical; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
   label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: 13px; }
   .row { display: flex; gap: 10px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
-  button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; font: 600 15px system-ui, sans-serif; cursor: pointer; }
+  button { min-height: 48px; background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 12px 20px; font: 600 16px system-ui, sans-serif; cursor: pointer; }
   button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
   button:disabled { opacity: .6; cursor: wait; }
   .status { color: var(--muted); font-size: 13px; }
@@ -42,15 +42,15 @@
   #history { margin-top: 28px; }
   #history h2 { font: 700 17px Georgia, serif; margin: 0 0 8px; }
   #historyEmpty { color: var(--muted); font-size: 13px; margin: 0; }
-  .h-item { display: flex; align-items: stretch; background: var(--card); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; min-width: 0; }
-  .h-open { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; text-align: left; background: transparent; color: var(--ink); padding: 9px 12px; font: 14px/1.35 system-ui, sans-serif; }
+  .h-item { display: flex; align-items: stretch; background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; min-width: 0; }
+  .h-open { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; text-align: left; background: transparent; color: var(--ink); padding: 14px 16px; font: 15px/1.4 system-ui, sans-serif; }
   .h-date { font-weight: 600; white-space: nowrap; }
   .h-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
   .h-prev { flex-basis: 100%; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .h-prog { flex-basis: 100%; height: 3px; margin-top: 5px; border-radius: 2px; background: var(--line); overflow: hidden; }
   .h-prog > span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
   .h-prog.full > span { background: var(--muted); }
-  .h-del { background: transparent; color: var(--muted); padding: 0 14px; font-size: 20px; line-height: 1; border-left: 1px solid var(--line); border-radius: 0 8px 8px 0; }
+  .h-del { min-width: 56px; background: transparent; color: var(--muted); padding: 0 16px; font-size: 22px; line-height: 1; border-left: 1px solid var(--line); border-radius: 0 8px 8px 0; }
   .h-del:hover { color: var(--err); }
 
   /* Etiqueta de tono (lista y animación) */
@@ -90,23 +90,28 @@
   .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 14px 0; }
   .toolbar button:disabled { opacity: .45; cursor: default; }
   .p-sub { display: flex; justify-content: flex-end; margin: -6px 0 6px; }
-  .linkish { background: transparent; color: var(--muted); padding: 6px 2px; font: 600 13px system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; }
+  .linkish { background: transparent; color: var(--muted); padding: 6px 4px; font: 600 15px system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; }
   .linkish:hover { color: var(--ink); }
   .p-end { text-align: center; padding: 28px 16px; margin-top: 4px; background: var(--card); border: 1px dashed var(--line); border-radius: 8px; }
   .p-end-t { font: 700 22px Georgia, serif; margin: 0 0 6px; }
   .p-end .status { margin: 0 0 14px; }
   .plist { list-style: none; padding: 0; margin: 0; }
-  .plist > li { display: grid; grid-template-columns: 28px 30px minmax(0, 1fr) auto; gap: 10px; align-items: start; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--neutral); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .plist > li { position: relative; display: grid; grid-template-columns: 36px 30px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 72px; background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--neutral); border-radius: 10px; padding: 14px 16px 14px 14px; margin-bottom: 12px; cursor: pointer; transition: background-color .15s; }
+  .plist > li:hover { background: var(--neutral-bg); }
   .plist > li.gracioso { border-left-color: var(--fun); }
   .plist > li.serio { border-left-color: var(--serious); }
   .plist > li.done { opacity: .45; }
   .plist > li.leaving { overflow: hidden; pointer-events: none; }
   .plist .n { font: 700 18px Georgia, serif; color: var(--muted); text-align: right; }
-  .plist .t a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
-  .plist .t a:hover { text-decoration: underline; }
-  .plist .meta { font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+  .plist .t a { color: var(--ink); font-size: 17px; line-height: 1.3; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+  /* El link cubre toda la fila: tocar en cualquier parte abre la noticia. */
+  .plist .t a::after { content: ""; position: absolute; inset: 0; border-radius: 10px; }
+  .plist .t a:focus-visible { outline: none; }
+  .plist .t a:focus-visible::after { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .plist > li:hover .t a { text-decoration: underline; }
+  .plist .meta { font-size: 13px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
   /* Reordenar: se arrastra solo desde el ⋮⋮ (el resto de la fila sigue haciendo scroll y abriendo links) */
-  .grip { display: flex; align-items: center; justify-content: center; width: 40px; height: 44px; margin: -10px 0 -10px -12px; padding: 0; border-radius: 6px; background: transparent; color: var(--muted); font: 700 15px system-ui, sans-serif; letter-spacing: -2px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  .grip { position: relative; z-index: 1; align-self: stretch; display: flex; align-items: center; justify-content: center; width: 48px; min-height: 56px; height: auto; margin: -14px 0 -14px -14px; padding: 0; border-radius: 10px 0 0 10px; background: transparent; color: var(--muted); font: 700 18px system-ui, sans-serif; letter-spacing: -2px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   .grip:hover { color: var(--ink); background: var(--neutral-bg); }
   .grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .plist.is-dragging { user-select: none; -webkit-user-select: none; }
@@ -121,7 +126,7 @@
     .plist.is-dragging > li:not(.dragging) { transition: none; }
   }
   @media (max-width: 420px) {
-    .plist > li { grid-template-columns: 28px 24px minmax(0, 1fr); gap: 8px; }
+    .plist > li { grid-template-columns: 36px 24px minmax(0, 1fr); gap: 10px; }
     .plist > li .tag { grid-column: 3; justify-self: start; }
   }
 </style>
