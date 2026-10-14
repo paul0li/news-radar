@@ -47,6 +47,9 @@
   .h-date { font-weight: 600; white-space: nowrap; }
   .h-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
   .h-prev { flex-basis: 100%; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .h-prog { flex-basis: 100%; height: 3px; margin-top: 5px; border-radius: 2px; background: var(--line); overflow: hidden; }
+  .h-prog > span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+  .h-prog.full > span { background: var(--muted); }
   .h-del { background: transparent; color: var(--muted); padding: 0 14px; font-size: 20px; line-height: 1; border-left: 1px solid var(--line); border-radius: 0 8px 8px 0; }
   .h-del:hover { color: var(--err); }
 
@@ -84,13 +87,22 @@
   .p-crit { margin: 8px 0 0; font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--card); border: 1px dashed var(--line); overflow-wrap: anywhere; }
   .p-crit b { font-weight: 600; color: var(--muted); }
   .rhythm { display: flex; gap: 2px; margin: 14px 0 0; }
-  .rhythm span { flex: 1; height: 8px; border-radius: 2px; }
+  .rhythm span { flex: 1; height: 8px; border-radius: 2px; transition: opacity .3s; }
+  .rhythm span.done { opacity: .22; }
   .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 14px 0; }
+  .toolbar button:disabled { opacity: .45; cursor: default; }
+  .p-sub { display: flex; justify-content: flex-end; margin: -6px 0 6px; }
+  .linkish { background: transparent; color: var(--muted); padding: 6px 2px; font: 600 13px system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; }
+  .linkish:hover { color: var(--ink); }
+  .p-end { text-align: center; padding: 28px 16px; margin-top: 4px; background: var(--card); border: 1px dashed var(--line); border-radius: 8px; }
+  .p-end-t { font: 700 22px Georgia, serif; margin: 0 0 6px; }
+  .p-end .status { margin: 0 0 14px; }
   .plist { list-style: none; padding: 0; margin: 0; }
   .plist > li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: start; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--neutral); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
   .plist > li.gracioso { border-left-color: var(--fun); }
   .plist > li.serio { border-left-color: var(--serious); }
   .plist > li.done { opacity: .45; }
+  .plist > li.leaving { overflow: hidden; pointer-events: none; }
   .plist .n { font: 700 18px Georgia, serif; color: var(--muted); text-align: right; }
   .plist .t a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
   .plist .t a:hover { text-decoration: underline; }
@@ -148,9 +160,16 @@
     <div class="toolbar" id="toolbar">
       <button id="openNext">Abrir siguiente ↗</button>
       <button class="ghost" id="copy">Copiar lista</button>
+      <button class="ghost" id="reset">Reiniciar</button>
       <span id="pStatus" class="status" role="status"></span>
     </div>
+    <div class="p-sub"><button class="linkish" id="toggleDone" hidden></button></div>
     <ol id="list" class="plist"></ol>
+    <div class="p-end" id="pEnd" hidden>
+      <p class="p-end-t">¡Pauta terminada! 🎉</p>
+      <p class="status">Abriste todos los links.</p>
+      <button id="resetEnd">Reiniciar</button>
+    </div>
   </section>
 </main>
 
@@ -257,36 +276,92 @@
     if (pauta) renderPauta();
   }
 
-  // Guarda en el servidor qué links ya se abrieron (fire-and-forget; el historial espera a que termine).
+  // ¿Mostrar los links ya vistos (atenuados)? Por defecto se ocultan.
+  let showDone = false;
+  try { showDone = localStorage.getItem("pauta:mostrarVistos") === "1"; } catch {}
+
+  // Guarda en el servidor qué links ya se abrieron. Siempre manda el set completo de vistos y
+  // los envíos de una misma pauta van uno tras otro: si hay cambios mientras uno está en vuelo,
+  // al terminar se manda el estado local más reciente. La respuesta nunca pisa el estado local.
+  // `saving` es la promesa que el historial espera antes de recargar.
   let saving = Promise.resolve();
+  let saveError = false;
   function saveDone() {
-    if (!current) return;
-    const done = items.filter((it) => it.done).map((it) => it.id);
-    saving = api(`api/pautas/${current.id}`, { method: "PUT", body: JSON.stringify({ done }) })
-      .catch((e) => console.warn("No pude guardar los vistos:", e));
+    const p = current;
+    if (!p) return saving;
+    p._dirty = true;
+    if (!p._flush) {
+      p._flush = (async () => {
+        try {
+          while (p._dirty) {
+            p._dirty = false;
+            const done = p.items.filter((it) => it.done).map((it) => it.id);
+            try {
+              await api(`api/pautas/${encodeURIComponent(p.id)}`, { method: "PUT", body: JSON.stringify({ done }) });
+              if (saveError && !p._dirty) {
+                saveError = false;
+                if (view === "pauta" && current === p) status("Guardado.");
+              }
+            } catch (e) {
+              console.warn("No pude guardar los vistos:", e);
+              saveError = true;
+              if (view === "pauta" && current === p) status(`No pude guardar los vistos (${e.message.replace(/\.$/, "")}). Se reintenta en el próximo cambio.`, true);
+            }
+          }
+        } finally {
+          p._flush = null;
+        }
+      })();
+      saving = p._flush;
+    }
+    return saving;
   }
 
+  const doneCount = () => items.filter((it) => it.done).length;
+
   function markDone(it) {
-    if (it.done) return;
+    if (it.done) return false;
     it.done = true;
     saveDone();
     renderHeader();
+    renderRhythm();
+    return true;
   }
 
   function renderHeader() {
-    const doneCount = items.filter((it) => it.done).length;
+    const n = items.length;
+    const d = doneCount();
+    const next = items.findIndex((it) => !it.done);
+    const vistos = `${d} ${d === 1 ? "visto" : "vistos"}`;
     $("pBarTitle").textContent = fecha(current.createdAt);
     $("pTitle").textContent = `Pauta del ${fecha(current.createdAt)}`;
-    $("pMeta").textContent = `${items.length} links · ${doneCount}/${items.length} vistos`;
+    $("pMeta").textContent = next === -1 ? `${n} links · todos vistos` : `Vas en la ${next + 1} de ${n} · ${vistos}`;
     $("pCrit").hidden = !current.criterio;
     $("pCrit").querySelector("span").textContent = current.criterio || "";
+    $("openNext").disabled = next === -1;
+    $("reset").disabled = d === 0;
+    $("toggleDone").hidden = d === 0;
+    $("toggleDone").textContent = showDone ? "Ocultar vistos" : `Mostrar vistos (${d})`;
+    $("pEnd").hidden = !(n > 0 && next === -1);
   }
 
-  // Dibuja la barra de ritmo y la lista en el orden de `items`.
+  // Barra de ritmo: todos los links, los vistos atenuados.
+  function renderRhythm() {
+    $("rhythm").replaceChildren(...items.map((it) => {
+      const bar = document.createElement("span");
+      bar.style.background = colors[it.tono] || colors.neutro;
+      if (it.done) bar.className = "done";
+      return bar;
+    }));
+  }
+
+  // Dibuja la barra de ritmo y la lista en el orden de `items`. Los vistos se omiten salvo con
+  // "Mostrar vistos"; cada link conserva su número en la pauta completa (índice en `items` + 1).
   function renderList() {
+    renderRhythm();
     $("list").replaceChildren();
-    $("rhythm").replaceChildren();
     items.forEach((it, i) => {
+      if (it.done && !showDone) return;
       const li = document.createElement("li");
       li.className = it.tono + (it.done ? " done" : "");
       li.dataset.id = it.id;
@@ -295,14 +370,32 @@
       const a = li.querySelector("a");
       a.href = it.url;
       a.textContent = it.title || it.url;
-      a.addEventListener("click", () => { markDone(it); li.classList.add("done"); });
+      // No hacer preventDefault: el navegador abre la pestaña y después escondemos el link.
+      const opened = () => { if (markDone(it)) hideItem(li); };
+      a.addEventListener("click", opened);
+      a.addEventListener("auxclick", (e) => { if (e.button === 1) opened(); });
       li.querySelector(".meta").textContent = `${it.domain} · ${it.motivo}`;
       li.querySelector(".tag").textContent = it.tono;
       $("list").appendChild(li);
-      const bar = document.createElement("span");
-      bar.style.background = colors[it.tono] || colors.neutro;
-      $("rhythm").appendChild(bar);
     });
+  }
+
+  // Un link recién abierto: si se muestran los vistos solo se atenúa; si no, se pliega y desaparece.
+  function hideItem(li) {
+    if (!li || !li.isConnected) return renderList();
+    if (showDone) return li.classList.add("done");
+    if (reduceMotion.matches || !li.animate) return setTimeout(renderList, 0); // tras abrir la pestaña
+    const cs = getComputedStyle(li);
+    li.classList.add("leaving");
+    const anim = li.animate([
+      { height: `${li.offsetHeight}px`, opacity: 1, marginBottom: cs.marginBottom, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom, transform: "none" },
+      { height: `${li.offsetHeight}px`, opacity: 0, marginBottom: cs.marginBottom, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom, transform: "translateX(24px)", offset: 0.45 },
+      { height: "0px", opacity: 0, marginBottom: "0px", paddingTop: "0px", paddingBottom: "0px", borderTopWidth: "0px", borderBottomWidth: "0px", transform: "translateX(24px)" },
+    ], { duration: 380, easing: "ease-in", fill: "forwards" });
+    // El timer cubre el caso de la pestaña en segundo plano (el usuario está en el link recién abierto).
+    const done = () => li.isConnected && renderList();
+    anim.finished.then(done, () => {});
+    setTimeout(done, 450);
   }
 
   function renderPauta() {
@@ -322,8 +415,27 @@
     if (!it) return status("Ya abriste todos.");
     window.open(it.url, "_blank", "noopener");
     markDone(it);
+    hideItem($("list").querySelector(`li[data-id="${it.id}"]`));
+  });
+
+  $("toggleDone").addEventListener("click", () => {
+    showDone = !showDone;
+    try { localStorage.setItem("pauta:mostrarVistos", showDone ? "1" : "0"); } catch {}
+    renderHeader();
     renderList();
   });
+
+  function resetPauta() {
+    if (!current || doneCount() === 0) return;
+    if (!confirm("¿Reiniciar la pauta? Vuelven a aparecer todos los links.")) return;
+    for (const it of items) it.done = false;
+    saveDone();
+    renderPauta();
+    status("Pauta reiniciada.");
+    window.scrollTo(0, 0);
+  }
+  $("reset").addEventListener("click", resetPauta);
+  $("resetEnd").addEventListener("click", resetPauta);
 
   /* ---------- Historial (vista inicio) ---------- */
 
@@ -343,9 +455,12 @@
       const row = document.createElement("div");
       row.className = "h-item";
       row.dataset.id = p.id;
-      row.innerHTML = `<button class="h-open"><span class="h-date"></span><span class="h-meta"></span><span class="h-prev"></span></button><button class="h-del" title="Borrar" aria-label="Borrar pauta">×</button>`;
+      row.innerHTML = `<button class="h-open"><span class="h-date"></span><span class="h-meta"></span><span class="h-prev"></span><span class="h-prog" aria-hidden="true"><span></span></span></button><button class="h-del" title="Borrar" aria-label="Borrar pauta">×</button>`;
       row.querySelector(".h-date").textContent = fecha(p.createdAt);
-      row.querySelector(".h-meta").textContent = `${p.count} links · ${p.doneCount}/${p.count} vistos`;
+      const full = p.count > 0 && p.doneCount >= p.count;
+      row.querySelector(".h-meta").textContent = full ? `${p.count} links · terminada ✓` : `${p.count} links · ${p.doneCount}/${p.count} vistos`;
+      row.querySelector(".h-prog").classList.toggle("full", full);
+      row.querySelector(".h-prog > span").style.width = `${p.count ? Math.round((p.doneCount / p.count) * 100) : 0}%`;
       row.querySelector(".h-prev").textContent = p.preview[0] || "";
       row.querySelector(".h-open").addEventListener("click", () => goPauta(p.id));
       row.querySelector(".h-del").addEventListener("click", () => removePauta(p));
