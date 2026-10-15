@@ -129,6 +129,21 @@ export async function updatePauta(id, { order, done } = {}) {
   });
 }
 
+// Noticia de último minuto: entra primera, con un id nuevo (el mayor + 1).
+export async function addItem(id, { title, titulo, url = "", domain = "", tono = "neutro" }) {
+  fileOf(id);
+  return withLock(id, async () => {
+    const pauta = await getPauta(id);
+    const item = {
+      id: pauta.items.reduce((max, it) => Math.max(max, it.id), 0) + 1,
+      title, titulo: titulo || title, url, domain, tono, done: false, ultimo: true,
+    };
+    pauta.items.unshift(item);
+    pauta.updatedAt = new Date().toISOString();
+    return { pauta: await save(pauta), item };
+  });
+}
+
 export async function deletePauta(id) {
   try {
     await unlink(fileOf(id));

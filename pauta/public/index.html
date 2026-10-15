@@ -93,6 +93,12 @@
   .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 14px 0; }
   .toolbar button:disabled { opacity: .45; cursor: default; }
   .p-sub { display: flex; justify-content: flex-end; margin: -6px 0 6px; }
+  /* Último minuto */
+  #ultimo { background: var(--err); }
+  .um-form { margin: 0 0 16px; padding: 14px; background: var(--card); border: 1px solid var(--err); border-radius: 10px; }
+  .um-form label:first-child { margin-top: 0; }
+  .um-form .row { margin-top: 12px; }
+  .plist > li.ultimo .meta b { color: var(--err); font-weight: 700; }
   .linkish { background: transparent; color: var(--muted); padding: 6px 4px; font: 600 15px system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; }
   .linkish:hover { color: var(--ink); }
   .p-end { text-align: center; padding: 28px 16px; margin-top: 4px; background: var(--card); border: 1px dashed var(--line); border-radius: 8px; }
@@ -181,8 +187,19 @@
       <button id="openNext">Abrir siguiente ↗</button>
       <button class="ghost" id="copy">Copiar lista</button>
       <button class="ghost" id="reset">Reiniciar</button>
+      <button id="ultimo" aria-expanded="false" aria-controls="umForm">Último minuto</button>
       <span id="pStatus" class="status" role="status"></span>
     </div>
+    <form class="um-form" id="umForm" hidden>
+      <label for="umTitular">Titular de último minuto</label>
+      <input id="umTitular" maxlength="300" autocomplete="off" placeholder="Ej: temblor fuerte en la zona central" required>
+      <label for="umUrl">Link (opcional)</label>
+      <input id="umUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://…">
+      <div class="row">
+        <button id="umAdd" type="submit">Agregar arriba</button>
+        <button id="umCancel" type="button" class="ghost">Cancelar</button>
+      </div>
+    </form>
     <div class="p-sub"><span class="hint" id="dragHint" hidden>Arrastra ⋮⋮ para mover</span><span></span></div>
     <ol id="list" class="plist"></ol>
     <div class="p-end" id="pEnd" hidden>
@@ -293,6 +310,7 @@
   function setPauta(pauta) {
     current = pauta;
     items = pauta ? pauta.items : [];
+    showUltimo(false);
     if (pauta) renderPauta();
   }
 
@@ -392,20 +410,24 @@
     items.forEach((it, i) => {
       if (it.done && !showDone) return;
       const li = document.createElement("li");
-      li.className = it.tono + (it.done ? " done" : "");
+      li.className = it.tono + (it.done ? " done" : "") + (it.ultimo ? " ultimo" : "");
       li.dataset.id = it.id;
       li.innerHTML = `<button type="button" class="grip" aria-label="Mover">⋮⋮</button><div class="n"></div><div class="t"><a target="_blank" rel="noopener noreferrer"></a><div class="meta"></div></div><span class="tag"></span>`;
       li.querySelector(".n").textContent = i + 1;
       const a = li.querySelector("a");
-      a.href = it.url;
+      // No hacer preventDefault: el navegador abre la pestaña y después escondemos el link.
+      const opened = () => { if (markDone(it)) hideItem(li); };
+      // Las de último minuto pueden venir sin link: tocar la fila solo la marca como vista.
+      if (it.url) a.href = it.url;
+      else { a.setAttribute("role", "button"); a.tabIndex = 0; a.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); opened(); } }); }
       a.textContent = it.titulo || it.title || it.url;
       // El título original queda como tooltip, por si la reescritura confunde.
       if (it.titulo && it.titulo !== it.title) a.title = `Original: ${it.title}`;
-      // No hacer preventDefault: el navegador abre la pestaña y después escondemos el link.
-      const opened = () => { if (markDone(it)) hideItem(li); };
       a.addEventListener("click", opened);
       a.addEventListener("auxclick", (e) => { if (e.button === 1) opened(); });
-      li.querySelector(".meta").textContent = it.domain;
+      const meta = li.querySelector(".meta");
+      if (it.ultimo) meta.append(Object.assign(document.createElement("b"), { textContent: "Último minuto" }), it.domain ? ` · ${it.domain}` : "");
+      else meta.textContent = it.domain;
       li.querySelector(".tag").textContent = it.tono;
       const grip = li.querySelector(".grip");
       grip.title = "Arrastra para mover (o usa ↑ ↓)";
@@ -638,18 +660,62 @@
   }
 
   $("copy").addEventListener("click", async () => {
-    const txt = items.map((it, i) => `${i + 1}. ${it.titulo || it.title}\n${it.url}`).join("\n\n");
+    const txt = items.map((it, i) => [`${i + 1}. ${it.titulo || it.title}`, it.url].filter(Boolean).join("\n")).join("\n\n");
     try { await navigator.clipboard.writeText(txt); status("Lista copiada."); } catch { status("No pude copiar.", true); }
   });
 
   $("openNext").addEventListener("click", () => {
     const it = items.find((x) => !x.done);
     if (!it) return status("Ya abriste todos.");
-    window.open(it.url, "_blank", "noopener");
+    if (it.url) window.open(it.url, "_blank", "noopener");
     markDone(it);
     hideItem($("list").querySelector(`li[data-id="${it.id}"]`));
   });
 
+
+  /* ---------- Último minuto: la IA redacta el titular y entra primero ---------- */
+
+  function showUltimo(on) {
+    $("umForm").hidden = !on;
+    $("ultimo").setAttribute("aria-expanded", String(on));
+    if (on) $("umTitular").focus();
+  }
+  $("ultimo").addEventListener("click", () => showUltimo($("umForm").hidden));
+  $("umCancel").addEventListener("click", () => showUltimo(false));
+
+  let umBusy = false;
+  $("umForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (umBusy || !current) return;
+    const titular = $("umTitular").value.trim();
+    if (!titular) return status("Escribe el titular.", true);
+    const p = current;
+    umBusy = true;
+    $("umAdd").disabled = true;
+    status("Redactando el titular con IA…");
+    try {
+      await saving; // que el orden local ya esté guardado antes de sumar la nueva
+      const { item } = await api(`api/pautas/${encodeURIComponent(p.id)}/ultimo`, {
+        method: "POST",
+        body: JSON.stringify({ titular, url: $("umUrl").value.trim() }),
+      });
+      // Se suma al estado local (no se reemplaza) para no perder vistos u orden que estén en vuelo.
+      p.items.unshift(item);
+      if (current === p) {
+        $("umTitular").value = "";
+        $("umUrl").value = "";
+        showUltimo(false);
+        renderPauta();
+        status("Noticia de último minuto agregada arriba. Arrastra ⋮⋮ para moverla.");
+        window.scrollTo(0, 0);
+      }
+    } catch (err) {
+      if (current === p) status(err.message, true);
+    } finally {
+      umBusy = false;
+      $("umAdd").disabled = false;
+    }
+  });
 
   function resetPauta() {
     if (!current || doneCount() === 0) return;

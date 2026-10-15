@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPauta, getPauta, listPautas, updatePauta, deletePauta } from "../store.js";
+import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem } from "../store.js";
 
 let dir;
 before(async () => {
@@ -65,6 +65,27 @@ test("done marca exactamente los ids entregados", async () => {
   await assert.rejects(updatePauta(p.id, { done: [7] }), (e) => e.status === 400);
   const [s] = (await listPautas()).filter((x) => x.id === p.id);
   assert.equal(s.doneCount, 1);
+});
+
+test("addItem suma la noticia de último minuto primera, con id nuevo", async () => {
+  const p = await createPauta({ items });
+  await updatePauta(p.id, { order: [3, 1, 4, 2], done: [1] });
+  const { pauta, item } = await addItem(p.id, { title: "temblor fuerte", titulo: "Fuerte temblor en la zona central", tono: "serio" });
+  assert.deepEqual(item, {
+    id: 5, title: "temblor fuerte", titulo: "Fuerte temblor en la zona central", url: "", domain: "", tono: "serio", done: false, ultimo: true,
+  });
+  assert.deepEqual(pauta.items.map((it) => it.id), [5, 3, 1, 4, 2]);
+  assert.deepEqual(pauta.items.map((it) => it.done), [false, false, true, false, false]);
+  assert.deepEqual(await getPauta(p.id), pauta);
+  // Después se puede mover con el reordenamiento de siempre.
+  const u = await updatePauta(p.id, { order: [3, 1, 5, 4, 2] });
+  assert.equal(u.items[2].titulo, "Fuerte temblor en la zona central");
+  const { item: otro } = await addItem(p.id, { title: "otra", url: "https://e.cl/x", domain: "e.cl" });
+  assert.equal(otro.id, 6);
+  assert.equal(otro.titulo, "otra");
+  assert.equal((await listPautas()).find((x) => x.id === p.id).preview[0], "otra");
+  await assert.rejects(addItem("20000101-000000-abcd", { title: "x" }), (e) => e.status === 404);
+  await assert.rejects(addItem("../x", { title: "x" }), (e) => e.status === 400);
 });
 
 test("no encontrada → 404", async () => {

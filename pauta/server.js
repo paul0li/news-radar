@@ -5,8 +5,8 @@ import { timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { parseLinks } from "./parse.js";
-import { createPauta, getPauta, listPautas, updatePauta, deletePauta } from "./store.js";
+import { parseLinks, domainOf } from "./parse.js";
+import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -113,6 +113,17 @@ async function ordenar(items, criterio) {
   return orden;
 }
 
+// Último minuto: la IA redacta el titular con las mismas reglas que el resto de la pauta.
+// El id 0 es provisorio; el store le asigna el definitivo al guardarla.
+async function redactarUltimoMinuto(titular, url) {
+  const item = { id: 0, title: titular, url, domain: url ? domainOf(url) : "" };
+  const { orden } = await runClaude(
+    `Noticia de último minuto para sumar a una pauta ya armada. Va primera: solo redacta su título y clasifica su tono.\n` +
+      `${item.id}. ${item.title} (${item.domain || "sin link"})`,
+  );
+  return reconciliar([item], orden)[0];
+}
+
 // Garantiza una permutación válida: descarta ids inventados/duplicados y agrega al final los que falten.
 function reconciliar(items, orden) {
   const byId = new Map(items.map((it) => [it.id, it]));
@@ -217,6 +228,26 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Noticia de último minuto: /api/pautas/:id/ultimo
+  const um = path.match(/^\/api\/pautas\/([^/]+)\/ultimo$/);
+  if (um && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const titular = String(body.titular ?? "").replace(/\s+/g, " ").trim();
+      const url = String(body.url ?? "").trim();
+      if (!titular) return send(res, 400, { error: "Escribe el titular." });
+      if (titular.length > 300) return send(res, 400, { error: "El titular es demasiado largo." });
+      if (url && !/^https?:\/\/\S+$/i.test(url)) return send(res, 400, { error: "El link debe empezar con http:// o https://" });
+      await getPauta(um[1]); // 400/404 antes de gastar una llamada a la IA
+      const nuevo = await redactarUltimoMinuto(titular, url);
+      return send(res, 200, await addItem(um[1], nuevo));
+    } catch (err) {
+      if (err.status) return send(res, err.status, { error: err.message });
+      console.error(err);
+      return send(res, 502, { error: err.message || "Error inesperado." });
+    }
+  }
+
   // Historial: /api/pautas y /api/pautas/:id
   const m = path.match(/^\/api\/pautas(?:\/([^/]+))?$/);
   if (m) {
@@ -242,4 +273,4 @@ const server = http.createServer(async (req, res) => {
   send(res, 404, { error: "No encontrado" });
 });
 
-server.listen(PORT, HOST, () => console.log(`Pauta editorial en http://${HOST}:${PORT} (modelo ${MODEL})`));
+server.listen(PORT, HOST, () => console.log(`Pauta editorial en http://${HOST}:${server.address().port} (modelo ${MODEL})`));

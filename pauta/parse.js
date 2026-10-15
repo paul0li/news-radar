@@ -14,7 +14,7 @@ function cleanTitle(s) {
     .trim();
 }
 
-function domainOf(url) {
+export function domainOf(url) {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {
