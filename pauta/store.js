@@ -107,7 +107,8 @@ function checkIds(value, known, name) {
   if (new Set(value).size !== value.length) throw httpError(400, `"${name}" tiene ids repetidos.`);
 }
 
-export async function updatePauta(id, { order, done } = {}) {
+// `actual` es la noticia que se está comentando (la última que se abrió), o null.
+export async function updatePauta(id, { order, done, actual } = {}) {
   fileOf(id); // valida el id antes de tomar el lock
   return withLock(id, async () => {
     const pauta = await getPauta(id);
@@ -118,12 +119,16 @@ export async function updatePauta(id, { order, done } = {}) {
       if (order.length !== known.size) throw httpError(400, '"order" debe incluir todos los ids exactamente una vez.');
     }
     if (done !== undefined) checkIds(done, known, "done");
+    if (actual !== undefined && actual !== null && !(Number.isInteger(actual) && known.has(actual))) {
+      throw httpError(400, '"actual" debe ser un id existente o null.');
+    }
 
     if (order !== undefined) pauta.items = order.map((i) => byId.get(i));
     if (done !== undefined) {
       const set = new Set(done);
       for (const it of pauta.items) it.done = set.has(it.id);
     }
+    if (actual !== undefined) pauta.actual = actual;
     pauta.updatedAt = new Date().toISOString();
     return save(pauta);
   });
@@ -152,6 +157,7 @@ export async function removeItem(id, itemId) {
     const i = pauta.items.findIndex((it) => it.id === itemId);
     if (i === -1) throw httpError(404, "Esa noticia no está en la pauta.");
     pauta.items.splice(i, 1);
+    if (pauta.actual === itemId) pauta.actual = null;
     pauta.updatedAt = new Date().toISOString();
     return save(pauta);
   });

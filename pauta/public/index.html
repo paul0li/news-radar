@@ -344,6 +344,7 @@
             const body = {};
             if (d.order) body.order = p.items.map((it) => it.id);
             if (d.done) body.done = p.items.filter((it) => it.done).map((it) => it.id);
+            if (d.actual) body.actual = p.actual ?? null;
             try {
               await api(`api/pautas/${encodeURIComponent(p.id)}`, { method: "PUT", body: JSON.stringify(body) });
               if (saveError && !p._dirty) {
@@ -355,7 +356,7 @@
               saveError = true;
               if (p._dirty) p._dirty = { ...d, ...p._dirty }; // ya hay otro cambio: va todo junto
               else p._retry = { ...p._retry, ...d };
-              const que = d.order ? (d.done ? "los cambios" : "el nuevo orden") : "los vistos";
+              const que = d.order ? (d.done || d.actual ? "los cambios" : "el nuevo orden") : d.done ? "los vistos" : "la noticia actual";
               if (view === "pauta" && current === p) status(`No pude guardar ${que} (${e.message.replace(/\.$/, "")}). Se reintenta en el próximo cambio.`, true);
             }
           }
@@ -369,10 +370,16 @@
   }
   const saveDone = () => queueSave({ done: true });
   const saveOrder = () => queueSave({ order: true });
+  const saveActual = () => queueSave({ actual: true });
 
   const doneCount = () => items.filter((it) => it.done).length;
 
+  // La última noticia abierta es la "actual": el banner de OBS la muestra en grande.
   function markDone(it) {
+    if (current.actual !== it.id) {
+      current.actual = it.id;
+      saveActual();
+    }
     if (it.done) return false;
     it.done = true;
     saveDone();
@@ -740,6 +747,7 @@
       // Se saca del estado local (no se reemplaza) para no perder cambios que estén en vuelo.
       const i = p.items.indexOf(it);
       if (i !== -1) p.items.splice(i, 1);
+      if (p.actual === it.id) p.actual = null;
       if (current === p) {
         renderPauta();
         status("Noticia borrada.");
@@ -755,7 +763,8 @@
     if (!current || doneCount() === 0) return;
     if (!confirm("¿Reiniciar la pauta? Vuelven a aparecer todos los links.")) return;
     for (const it of items) it.done = false;
-    saveDone();
+    current.actual = null;
+    queueSave({ done: true, actual: true });
     renderPauta();
     status("Pauta reiniciada.");
     window.scrollTo(0, 0);

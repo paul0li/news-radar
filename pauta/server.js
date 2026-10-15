@@ -179,12 +179,15 @@ const tickerHtml = await readFile(new URL("./public/ticker.html", import.meta.ur
 // Titulares de la pauta más reciente, para el banner de OBS.
 async function titularesActuales() {
   const [ultima] = await listPautas({ limit: 1 });
-  if (!ultima) return { id: null, createdAt: null, titulares: [] };
+  if (!ultima) return { id: null, createdAt: null, titulares: [], actual: null };
   const p = await getPauta(ultima.id);
+  const titular = (it) => ({ texto: it.titulo || it.title, tono: it.tono });
+  const actual = p.items.find((it) => it.id === p.actual);
   return {
     id: p.id,
     createdAt: p.createdAt,
-    titulares: p.items.map((it) => ({ texto: it.titulo || it.title, tono: it.tono })),
+    titulares: p.items.map(titular),
+    actual: actual ? titular(actual) : null,
   };
 }
 
@@ -267,8 +270,8 @@ const server = http.createServer(async (req, res) => {
       if (!id && req.method === "GET") return send(res, 200, { pautas: await listPautas() });
       if (id && req.method === "GET") return send(res, 200, { pauta: await getPauta(id) });
       if (id && req.method === "PUT") {
-        const { order, done } = await readBody(req);
-        return send(res, 200, { pauta: await updatePauta(id, { order, done }) });
+        const { order, done, actual } = await readBody(req);
+        return send(res, 200, { pauta: await updatePauta(id, { order, done, actual }) });
       }
       if (id && req.method === "DELETE") {
         await deletePauta(id);

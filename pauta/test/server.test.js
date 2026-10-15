@@ -71,6 +71,15 @@ test("último minuto: la IA redacta el titular y la noticia queda primera", asyn
   const { data: ticker } = await api("/api/ticker");
   assert.equal(ticker.id, p.id);
   assert.ok(ticker.titulares.some((t) => t.texto === "(fake) Título reescrito 0"));
+  assert.equal(ticker.actual, null);
+
+  // La última noticia abierta pasa a ser la actual del banner.
+  assert.equal((await api(`/api/pautas/${p.id}`, { actual: 4 }, "PUT")).status, 200);
+  assert.equal((await api("/api/ticker")).data.actual.texto, "(fake) Título reescrito 0");
+  assert.equal((await api(`/api/pautas/${p.id}`, { actual: 99 }, "PUT")).status, 400);
+  // Si se borra, el banner deja de mostrarla.
+  await api(`/api/pautas/${p.id}/items/4`, null, "DELETE");
+  assert.equal((await api("/api/ticker")).data.actual, null);
 });
 
 test("último minuto sin link", async () => {

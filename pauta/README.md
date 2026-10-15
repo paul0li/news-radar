@@ -69,12 +69,13 @@ To expose it publicly instead, put a reverse proxy with HTTPS (nginx, Caddy) in 
 ## OBS headline ticker
 
 `/ticker` is a page made for an OBS **Browser Source**: a transparent page with a bar that keeps
-scrolling the (rewritten) headlines of the most recent pauta, in running order. It polls every
-30 seconds; when a new pauta is created or reordered, the change is applied at the end of the
-current loop, so the bar never jumps.
+scrolling the (rewritten) headlines of the most recent pauta, in running order. Above the bar, in
+a larger font, it shows the **current story**: the last link opened in that pauta. It polls every
+3 seconds, so the current story changes almost right away; when a new pauta is created or
+reordered, the bar applies the change at the end of the current loop, so it never jumps.
 
-In OBS: *Sources → + → Browser*, URL `https://<your-host>/ticker`, width 1920, height 80 (or the
-bar's height). The machine running OBS must be able to reach the app (e.g. be on the same tailnet).
+In OBS: *Sources → + → Browser*, URL `https://<your-host>/ticker`, width 1920, height 1080 (full
+screen, since the current story sits above the bar; with `actual=no` the bar's height is enough). The machine running OBS must be able to reach the app (e.g. be on the same tailnet).
 
 Optional URL parameters:
 
@@ -91,9 +92,13 @@ Optional URL parameters:
 | `fuente` | `system-ui` | Font family. |
 | `aviso` | empty | Highlighted message shown between headlines (e.g. a fundraising call). |
 | `cada` | `5` | Show `aviso` after every N headlines (at least once per loop). |
+| `actual` | `si` | `no` hides the current story. |
+| `tamactual` | `tam × 1.5` | Font size of the current story in px. |
+| `ahora` | `Ahora` | Label above the current story; empty (`ahora=`) hides it. |
+| `franja` | `si` | `no` hides the bar and shows only the current story, so it can live in its own OBS source (full screen) that you show and hide separately. |
 
 Example: `/ticker?tam=48&velocidad=120&etiqueta=Hoy`. The data comes from `GET /api/ticker`
-(`{ id, createdAt, titulares: [{ texto, tono }] }`).
+(`{ id, createdAt, titulares: [{ texto, tono }], actual: { texto, tono } | null }`).
 
 ## Configuration
 
@@ -119,10 +124,10 @@ All endpoints use the same auth as the page.
 | `POST /api/ordenar` | `{ texto, criterio? }` | `{ pauta, model }` (calls Claude and saves the result) |
 | `GET /api/pautas` | | `{ pautas: [{ id, createdAt, updatedAt, count, doneCount, preview }] }`, newest first (max 30) |
 | `GET /api/pautas/:id` | | `{ pauta }` |
-| `PUT /api/pautas/:id` | `{ order?, done? }` | `{ pauta }`. `order` must be a permutation of all item ids; `done` is the full list of opened item ids. |
+| `PUT /api/pautas/:id` | `{ order?, done?, actual? }` | `{ pauta }`. `order` must be a permutation of all item ids; `done` is the full list of opened item ids; `actual` is the id of the story being discussed (or `null`). |
 | `DELETE /api/pautas/:id` | | `{ ok: true }` |
 
-A pauta is `{ id, createdAt, updatedAt, criterio, items: [{ id, title, titulo, url, domain, tono, done }] }`;
+A pauta is `{ id, createdAt, updatedAt, criterio, actual, items: [{ id, title, titulo, url, domain, tono, done }] }`;
 the order of `items` is the running order. Invalid input returns `400`, unknown ids `404`, both as `{ error }`.
 
 ## Tuning the editorial rules

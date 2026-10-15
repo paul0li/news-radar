@@ -16,6 +16,10 @@
     fuente     familia tipográfica (system-ui)
     aviso      texto destacado que aparece entre los titulares (p. ej. una campaña)
     cada       cada cuántos titulares aparece el aviso (5)
+    actual     si | no (si): muestra en grande, sobre la franja, la última noticia abierta en la pauta
+    tamactual  tamaño de letra del titular actual en px (tam × 1.5)
+    ahora      texto de la etiqueta del titular actual (AHORA); vacío para ocultarla
+    franja     si | no (si): con "no" se muestra solo el titular actual, para tenerlo en otra fuente de OBS
   Ej: /ticker?tam=48&velocidad=120&etiqueta=HOY
 -->
 <style>
@@ -24,6 +28,7 @@
   .bar { position: fixed; left: 0; right: 0; bottom: 0; height: var(--alto); display: flex; align-items: stretch; background: var(--fondo); color: var(--color); font: 700 var(--tam)/1 var(--fuente); }
   .bar.arriba { top: 0; bottom: auto; }
   .bar.vacia { visibility: hidden; }
+  .bar.sin { display: none; }
   .label { flex: none; display: flex; align-items: center; padding: 0 calc(var(--tam) * .6); background: var(--acento); color: #fff; font-size: calc(var(--tam) * .62); letter-spacing: .08em; text-transform: uppercase; }
   .viewport { position: relative; flex: 1; overflow: hidden; display: flex; align-items: center; }
   .track { display: flex; white-space: nowrap; will-change: transform; }
@@ -34,9 +39,21 @@
   .serio .dot { background: #60a5fa; }
   .aviso { display: inline-flex; align-items: center; margin-right: calc(var(--tam) * 1.4); padding: calc(var(--tam) * .22) calc(var(--tam) * .5); border-radius: calc(var(--tam) * .3); background: var(--acento); color: #fff; }
   .aviso::before { content: "♥"; margin-right: calc(var(--tam) * .35); font-size: .8em; }
+  /* Titular actual: en grande, pegado a la franja. */
+  .now { position: fixed; left: 0; bottom: calc(var(--alto) + var(--tamActual) * .35); max-width: min(88vw, calc(var(--tamActual) * 24)); display: flex; flex-direction: column; align-items: flex-start; gap: calc(var(--tamActual) * .2); font-family: var(--fuente); transition: opacity .35s ease, transform .35s ease; }
+  .now.arriba { top: calc(var(--alto) + var(--tamActual) * .35); bottom: auto; }
+  .now.oculto { opacity: 0; transform: translateX(-24px); }
+  .now-label { background: var(--acento); color: #fff; font: 800 calc(var(--tamActual) * .38)/1 var(--fuente); letter-spacing: .1em; text-transform: uppercase; padding: calc(var(--tamActual) * .18) calc(var(--tamActual) * .4); margin-left: calc(var(--tamActual) * .5); }
+  .now-label[hidden] { display: none; }
+  .now-text { background: var(--fondo); color: var(--color); font: 800 var(--tamActual)/1.15 var(--fuente); padding: calc(var(--tamActual) * .3) calc(var(--tamActual) * .5); border-left: calc(var(--tamActual) * .16) solid var(--acento); }
+  .now-text span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-wrap: balance; }
 </style>
 </head>
 <body>
+<div class="now oculto" id="now" aria-live="polite">
+  <div class="now-label" id="nowLabel"></div>
+  <div class="now-text"><span id="nowText"></span></div>
+</div>
 <div class="bar vacia" id="bar">
   <div class="label" id="label"></div>
   <div class="viewport"><div class="track" id="track"></div></div>
@@ -55,7 +72,16 @@
   if (q.get("color")) root.setProperty("--color", q.get("color"));
   if (q.get("acento")) root.setProperty("--acento", q.get("acento"));
   if (q.get("fuente")) root.setProperty("--fuente", q.get("fuente"));
-  if (q.get("posicion") === "arriba") document.getElementById("bar").classList.add("arriba");
+  root.setProperty("--tamActual", `${num("tamactual", Math.round(TAM * 1.5), 10, 300)}px`);
+  if (q.get("posicion") === "arriba") for (const id of ["bar", "now"]) document.getElementById(id).classList.add("arriba");
+  const no = (k) => /^(no|0|false)$/i.test(q.get(k) || "");
+  const ACTUAL = !no("actual");
+  const FRANJA = !no("franja");
+  if (!FRANJA) document.getElementById("bar").classList.add("sin");
+  const ahora = q.has("ahora") ? q.get("ahora") : "Ahora";
+  const nowLabel = document.getElementById("nowLabel");
+  nowLabel.textContent = ahora;
+  nowLabel.hidden = !ahora;
   const AVISO = (q.get("aviso") || "").trim().slice(0, 200);
   const CADA = num("cada", 5, 1, 100);
   const etiqueta = q.has("etiqueta") ? q.get("etiqueta") : "Titulares";
@@ -108,13 +134,29 @@
     };
   }
 
+  // Titular actual: al cambiar, sale el anterior y entra el nuevo.
+  const now = document.getElementById("now");
+  const nowText = document.getElementById("nowText");
+  let actualKey = "";
+  let swap;
+  function showActual(actual) {
+    const texto = ACTUAL && actual?.texto ? actual.texto : "";
+    if (texto === actualKey) return;
+    actualKey = texto;
+    clearTimeout(swap);
+    now.classList.add("oculto");
+    if (!texto) return;
+    swap = setTimeout(() => { nowText.textContent = texto; now.classList.remove("oculto"); }, nowText.textContent ? 400 : 0);
+  }
+
   async function poll() {
     try {
       const r = await fetch("api/ticker", { cache: "no-store" });
       if (!r.ok) return;
-      const { titulares = [] } = await r.json();
+      const { titulares = [], actual = null } = await r.json();
+      showActual(actual);
       const key = JSON.stringify(titulares);
-      if (key === latestKey) return;
+      if (!FRANJA || key === latestKey) return;
       latestKey = key;
       if (!anim || titulares.length === 0) render(titulares); else pending = titulares;
     } catch {
@@ -123,7 +165,8 @@
   }
 
   poll();
-  setInterval(poll, 30_000);
+  // Cada 3 s para que el titular actual cambie al toque; la cinta igual espera a terminar la vuelta.
+  setInterval(poll, 3_000);
   // Si cambia el tamaño de la fuente en OBS, se rearma la cinta.
   let rz;
   addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => latestKey && render(JSON.parse(latestKey)), 300); });
