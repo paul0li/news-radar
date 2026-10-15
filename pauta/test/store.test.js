@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem } from "../store.js";
+import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem, removeItem } from "../store.js";
 
 let dir;
 before(async () => {
@@ -86,6 +86,21 @@ test("addItem suma la noticia de último minuto primera, con id nuevo", async ()
   assert.equal((await listPautas()).find((x) => x.id === p.id).preview[0], "otra");
   await assert.rejects(addItem("20000101-000000-abcd", { title: "x" }), (e) => e.status === 404);
   await assert.rejects(addItem("../x", { title: "x" }), (e) => e.status === 400);
+});
+
+test("removeItem saca una noticia y deja el resto igual", async () => {
+  const p = await createPauta({ items });
+  await updatePauta(p.id, { order: [3, 1, 4, 2], done: [4] });
+  const u = await removeItem(p.id, 1);
+  assert.deepEqual(u.items.map((it) => [it.id, it.done]), [[3, false], [4, true], [2, false]]);
+  assert.deepEqual(await getPauta(p.id), u);
+  await assert.rejects(removeItem(p.id, 1), (e) => e.status === 404);
+  // El reordenamiento sigue funcionando con los que quedan.
+  assert.deepEqual((await updatePauta(p.id, { order: [2, 3, 4] })).items.map((it) => it.id), [2, 3, 4]);
+  const { item } = await addItem(p.id, { title: "nueva" });
+  assert.equal(item.id, 5);
+  await assert.rejects(removeItem("20000101-000000-abcd", 1), (e) => e.status === 404);
+  await assert.rejects(removeItem("../x", 1), (e) => e.status === 400);
 });
 
 test("no encontrada → 404", async () => {

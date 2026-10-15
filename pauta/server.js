@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { parseLinks, domainOf } from "./parse.js";
-import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem } from "./store.js";
+import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem, removeItem } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -245,6 +245,17 @@ const server = http.createServer(async (req, res) => {
       if (err.status) return send(res, err.status, { error: err.message });
       console.error(err);
       return send(res, 502, { error: err.message || "Error inesperado." });
+    }
+  }
+
+  // Borrar una noticia: DELETE /api/pautas/:id/items/:itemId
+  const di = path.match(/^\/api\/pautas\/([^/]+)\/items\/(\d+)$/);
+  if (di && req.method === "DELETE") {
+    try {
+      return send(res, 200, { pauta: await removeItem(di[1], Number(di[2])) });
+    } catch (err) {
+      if (!err.status) console.error(err);
+      return send(res, err.status || 500, { error: err.status ? err.message : "Error inesperado." });
     }
   }
 

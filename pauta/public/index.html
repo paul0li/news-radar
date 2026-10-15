@@ -105,7 +105,7 @@
   .p-end-t { font: 700 22px Georgia, serif; margin: 0 0 6px; }
   .p-end .status { margin: 0 0 14px; }
   .plist { list-style: none; padding: 0; margin: 0; }
-  .plist > li { position: relative; display: grid; grid-template-columns: 36px 30px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 72px; background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--neutral); border-radius: 10px; padding: 14px 16px 14px 14px; margin-bottom: 12px; cursor: pointer; transition: background-color .15s; }
+  .plist > li { position: relative; display: grid; grid-template-columns: 36px 30px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; min-height: 72px; background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--neutral); border-radius: 10px; padding: 14px 16px 14px 14px; margin-bottom: 12px; cursor: pointer; transition: background-color .15s; }
   .plist > li:hover { background: var(--neutral-bg); }
   .plist > li.gracioso { border-left-color: var(--fun); }
   .plist > li.serio { border-left-color: var(--serious); }
@@ -122,6 +122,10 @@
   /* Reordenar: se arrastra solo desde el ⋮⋮ (el resto de la fila sigue haciendo scroll y abriendo links) */
   .grip { position: relative; z-index: 1; align-self: stretch; display: flex; align-items: center; justify-content: center; width: 48px; min-height: 56px; height: auto; margin: -14px 0 -14px -14px; padding: 0; border-radius: 10px 0 0 10px; background: transparent; color: var(--muted); font: 700 18px system-ui, sans-serif; letter-spacing: -2px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   .grip:hover { color: var(--ink); background: var(--neutral-bg); }
+  /* Borrar noticia: queda por encima del link que cubre la fila */
+  .del { position: relative; z-index: 1; width: 44px; min-height: 44px; margin: -8px -8px -8px -4px; padding: 0; background: transparent; color: var(--muted); font: 400 24px/1 system-ui, sans-serif; border-radius: 8px; }
+  .del:hover { color: var(--err); background: var(--neutral-bg); }
+  .del:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .plist.is-dragging { user-select: none; -webkit-user-select: none; }
   .plist.is-dragging a { pointer-events: none; }
@@ -135,8 +139,9 @@
     .plist.is-dragging > li:not(.dragging) { transition: none; }
   }
   @media (max-width: 420px) {
-    .plist > li { grid-template-columns: 36px 24px minmax(0, 1fr); gap: 10px; }
+    .plist > li { grid-template-columns: 36px 24px minmax(0, 1fr) auto; gap: 10px; }
     .plist > li .tag { grid-column: 3; justify-self: start; }
+    .plist > li .del { grid-column: 4; grid-row: 1 / span 2; }
   }
 </style>
 </head>
@@ -412,7 +417,7 @@
       const li = document.createElement("li");
       li.className = it.tono + (it.done ? " done" : "") + (it.ultimo ? " ultimo" : "");
       li.dataset.id = it.id;
-      li.innerHTML = `<button type="button" class="grip" aria-label="Mover">⋮⋮</button><div class="n"></div><div class="t"><a target="_blank" rel="noopener noreferrer"></a><div class="meta"></div></div><span class="tag"></span>`;
+      li.innerHTML = `<button type="button" class="grip" aria-label="Mover">⋮⋮</button><div class="n"></div><div class="t"><a target="_blank" rel="noopener noreferrer"></a><div class="meta"></div></div><span class="tag"></span><button type="button" class="del">×</button>`;
       li.querySelector(".n").textContent = i + 1;
       const a = li.querySelector("a");
       // No hacer preventDefault: el navegador abre la pestaña y después escondemos el link.
@@ -429,6 +434,10 @@
       if (it.ultimo) meta.append(Object.assign(document.createElement("b"), { textContent: "Último minuto" }), it.domain ? ` · ${it.domain}` : "");
       else meta.textContent = it.domain;
       li.querySelector(".tag").textContent = it.tono;
+      const del = li.querySelector(".del");
+      del.title = "Borrar noticia";
+      del.setAttribute("aria-label", `Borrar «${it.titulo || it.title}»`);
+      del.addEventListener("click", () => removeNoticia(it));
       const grip = li.querySelector(".grip");
       grip.title = "Arrastra para mover (o usa ↑ ↓)";
       grip.addEventListener("pointerdown", (e) => startDrag(e, li));
@@ -716,6 +725,31 @@
       $("umAdd").disabled = false;
     }
   });
+
+  /* ---------- Borrar una noticia ---------- */
+
+  let delBusy = false;
+  async function removeNoticia(it) {
+    if (delBusy || !current) return;
+    if (!confirm(`¿Borrar esta noticia de la pauta?\n\n«${it.titulo || it.title}»`)) return;
+    const p = current;
+    delBusy = true;
+    try {
+      await saving; // que el orden y los vistos pendientes lleguen antes de borrar
+      await api(`api/pautas/${encodeURIComponent(p.id)}/items/${it.id}`, { method: "DELETE" });
+      // Se saca del estado local (no se reemplaza) para no perder cambios que estén en vuelo.
+      const i = p.items.indexOf(it);
+      if (i !== -1) p.items.splice(i, 1);
+      if (current === p) {
+        renderPauta();
+        status("Noticia borrada.");
+      }
+    } catch (e) {
+      if (current === p) status(e.message, true);
+    } finally {
+      delBusy = false;
+    }
+  }
 
   function resetPauta() {
     if (!current || doneCount() === 0) return;

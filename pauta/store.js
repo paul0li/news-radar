@@ -144,6 +144,19 @@ export async function addItem(id, { title, titulo, url = "", domain = "", tono =
   });
 }
 
+// Saca una noticia de la pauta; las demás conservan su orden y si ya se vieron.
+export async function removeItem(id, itemId) {
+  fileOf(id);
+  return withLock(id, async () => {
+    const pauta = await getPauta(id);
+    const i = pauta.items.findIndex((it) => it.id === itemId);
+    if (i === -1) throw httpError(404, "Esa noticia no está en la pauta.");
+    pauta.items.splice(i, 1);
+    pauta.updatedAt = new Date().toISOString();
+    return save(pauta);
+  });
+}
+
 export async function deletePauta(id) {
   try {
     await unlink(fileOf(id));

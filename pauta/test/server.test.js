@@ -93,3 +93,17 @@ test("último minuto: errores", async () => {
   const { data } = await api(`/api/pautas/${p.id}`);
   assert.equal(data.pauta.items.length, 3); // nada se agregó
 });
+
+test("borrar una noticia de la pauta", async () => {
+  const p = await armarPauta();
+  const [primera, ...resto] = p.items;
+  const { status, data } = await api(`/api/pautas/${p.id}/items/${primera.id}`, null, "DELETE");
+  assert.equal(status, 200);
+  assert.deepEqual(data.pauta.items.map((it) => it.id), resto.map((it) => it.id));
+  const { data: guardada } = await api(`/api/pautas/${p.id}`);
+  assert.deepEqual(guardada.pauta.items.map((it) => it.id), resto.map((it) => it.id));
+
+  assert.equal((await api(`/api/pautas/${p.id}/items/${primera.id}`, null, "DELETE")).status, 404);
+  assert.equal((await api(`/api/pautas/20000101-000000-abcd/items/1`, null, "DELETE")).status, 404);
+  assert.equal((await api(`/api/pautas/nope/items/1`, null, "DELETE")).status, 400);
+});
