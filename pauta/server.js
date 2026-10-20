@@ -154,7 +154,8 @@ function authorized(req) {
 }
 
 function send(res, status, body, type = "application/json; charset=utf-8") {
-  res.writeHead(status, { "content-type": type });
+  // no-store: OBS y el navegador siempre piden la pauta y la página más nuevas.
+  res.writeHead(status, { "content-type": type, "cache-control": "no-store" });
   res.end(typeof body === "string" ? body : JSON.stringify(body));
 }
 

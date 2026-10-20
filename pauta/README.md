@@ -71,8 +71,9 @@ To expose it publicly instead, put a reverse proxy with HTTPS (nginx, Caddy) in 
 `/ticker` is a page made for an OBS **Browser Source**: a transparent page with a bar that keeps
 scrolling the (rewritten) headlines of the most recent pauta, in running order. Above the bar, in
 a larger font, it shows the **current story**: the last link opened in that pauta. It polls every
-3 seconds, so the current story changes almost right away; when a new pauta is created or
-reordered, the bar applies the change at the end of the current loop, so it never jumps.
+3 seconds, so the current story and the bar change almost right away: when a new pauta is created
+or its headlines change, the bar fades out and restarts with the new ones. Responses carry
+`Cache-Control: no-store`, so OBS never shows a cached page or cached headlines.
 
 In OBS: *Sources → + → Browser*, URL `https://<your-host>/ticker`, width 1920, height 1080 (full
 screen, since the current story sits above the bar; with `actual=no` the bar's height is enough). The machine running OBS must be able to reach the app (e.g. be on the same tailnet).

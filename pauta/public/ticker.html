@@ -31,7 +31,8 @@
   .bar.sin { display: none; }
   .label { flex: none; display: flex; align-items: center; padding: 0 calc(var(--tam) * .6); background: var(--acento); color: #fff; font-size: calc(var(--tam) * .62); letter-spacing: .08em; text-transform: uppercase; }
   .viewport { position: relative; flex: 1; overflow: hidden; display: flex; align-items: center; }
-  .track { display: flex; white-space: nowrap; will-change: transform; }
+  .track { display: flex; white-space: nowrap; will-change: transform; transition: opacity .3s ease; }
+  .track.cambiando { opacity: 0; }
   .seq { display: flex; align-items: center; flex: none; }
   .item { display: inline-flex; align-items: center; padding-right: calc(var(--tam) * 1.4); }
   .dot { width: calc(var(--tam) * .32); height: calc(var(--tam) * .32); border-radius: 50%; margin-right: calc(var(--tam) * .45); background: #a8a29e; flex: none; }
@@ -92,8 +93,8 @@
   const bar = document.getElementById("bar");
   const track = document.getElementById("track");
   let latestKey = "";  // últimos titulares recibidos
-  let pending = null;  // titulares nuevos, se aplican al terminar la vuelta
   let anim = null;
+  let fade;
 
   function buildSeq(titulares) {
     const seq = document.createElement("div");
@@ -129,9 +130,7 @@
     track.appendChild(seq.cloneNode(true));
     const w = seq.scrollWidth;
     anim = track.animate([{ transform: "translateX(0)" }, { transform: `translateX(-${w}px)` }], { duration: (w / VEL) * 1000, easing: "linear" });
-    anim.onfinish = () => {
-      if (pending) { const p = pending; pending = null; render(p); } else anim.play();
-    };
+    anim.onfinish = () => anim.play();
   }
 
   // Titular actual: al cambiar, sale el anterior y entra el nuevo.
@@ -158,14 +157,18 @@
       const key = JSON.stringify(titulares);
       if (!FRANJA || key === latestKey) return;
       latestKey = key;
-      if (!anim || titulares.length === 0) render(titulares); else pending = titulares;
+      // Titulares nuevos: se aplican al tiro, con un fundido corto para que no salte la cinta.
+      clearTimeout(fade);
+      if (!anim || titulares.length === 0) return render(titulares);
+      track.classList.add("cambiando");
+      fade = setTimeout(() => { render(titulares); track.classList.remove("cambiando"); }, 300);
     } catch {
       // Sin conexión: se sigue mostrando lo último que llegó.
     }
   }
 
   poll();
-  // Cada 3 s para que el titular actual cambie al toque; la cinta igual espera a terminar la vuelta.
+  // Cada 3 s, para que el titular actual y la cinta cambien al toque.
   setInterval(poll, 3_000);
   // Si cambia el tamaño de la fuente en OBS, se rearma la cinta.
   let rz;
