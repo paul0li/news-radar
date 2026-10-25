@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Titulares</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:ital,wght@0,800;1,800;1,900&display=swap" rel="stylesheet">
 <!--
   Banner de titulares para OBS (Fuente de navegador). Muestra en loop los titulares de la pauta más
   reciente y se actualiza solo. Parámetros opcionales en la URL:
@@ -18,7 +21,11 @@
     cada       cada cuántos titulares aparece el aviso (5)
     actual     si | no (si): muestra en grande, sobre la franja, la última noticia abierta en la pauta
     tamactual  tamaño de letra del titular actual en px (tam × 1.5)
-    ahora      texto de la etiqueta del titular actual (AHORA); vacío para ocultarla
+    ahora      texto de la barra sobre el titular actual (AHORA); vacío para ocultarla
+    sello      texto del sello a la izquierda del titular actual (EN VIVO); vacío para ocultarlo
+    hora       si | no (si): muestra la hora de Chile junto al titular actual
+    paleta     colores del titular actual: clasica | tv | tv-rosa | 24 | 24-calido (clasica);
+               con tv-rosa, la etiqueta y el aviso de la franja también (salvo que se pase acento)
     franja     si | no (si): con "no" se muestra solo el titular actual, para tenerlo en otra fuente de OBS
   Ej: /ticker?tam=48&velocidad=120&etiqueta=HOY
 -->
@@ -29,7 +36,7 @@
   .bar.arriba { top: 0; bottom: auto; }
   .bar.vacia { visibility: hidden; }
   .bar.sin { display: none; }
-  .label { flex: none; display: flex; align-items: center; padding: 0 calc(var(--tam) * .6); background: var(--acento); color: #fff; font-size: calc(var(--tam) * .62); letter-spacing: .08em; text-transform: uppercase; }
+  .label { flex: none; display: flex; align-items: center; padding: 0 calc(var(--tam) * .6); background: var(--label-fondo, var(--acento)); color: #fff; font-size: calc(var(--tam) * .62); letter-spacing: .08em; text-transform: uppercase; }
   .viewport { position: relative; flex: 1; overflow: hidden; display: flex; align-items: center; }
   .track { display: flex; white-space: nowrap; will-change: transform; transition: opacity .3s ease; }
   .track.cambiando { opacity: 0; }
@@ -38,22 +45,103 @@
   .dot { width: calc(var(--tam) * .32); height: calc(var(--tam) * .32); border-radius: 50%; margin-right: calc(var(--tam) * .45); background: #a8a29e; flex: none; }
   .gracioso .dot { background: #fbbf24; }
   .serio .dot { background: #60a5fa; }
-  .aviso { display: inline-flex; align-items: center; margin-right: calc(var(--tam) * 1.4); padding: calc(var(--tam) * .22) calc(var(--tam) * .5); border-radius: calc(var(--tam) * .3); background: var(--acento); color: #fff; }
+  .aviso { display: inline-flex; align-items: center; margin-right: calc(var(--tam) * 1.4); padding: calc(var(--tam) * .22) calc(var(--tam) * .5); border-radius: calc(var(--tam) * .3); background: var(--aviso-fondo, var(--acento)); color: #fff; }
+  /* Franja con la paleta tv-rosa: el fondo sigue negro; la etiqueta toma el rosa del titular y el aviso el azul del sello. */
+  .bar.paleta-tv-rosa { --label-fondo: linear-gradient(135deg, #ff6f8e, #d7263d); --aviso-fondo: linear-gradient(90deg, #1d3ad6, #19b5f0); }
   .aviso::before { content: "♥"; margin-right: calc(var(--tam) * .35); font-size: .8em; }
-  /* Titular actual: en grande, pegado a la franja. */
-  .now { position: fixed; left: 0; bottom: calc(var(--alto) + var(--tamActual) * .35); max-width: min(88vw, calc(var(--tamActual) * 24)); display: flex; flex-direction: column; align-items: flex-start; gap: calc(var(--tamActual) * .2); font-family: var(--fuente); transition: opacity .35s ease, transform .35s ease; }
-  .now.arriba { top: calc(var(--alto) + var(--tamActual) * .35); bottom: auto; }
-  .now.oculto { opacity: 0; transform: translateX(-24px); }
-  .now-label { background: var(--acento); color: #fff; font: 800 calc(var(--tamActual) * .38)/1 var(--fuente); letter-spacing: .1em; text-transform: uppercase; padding: calc(var(--tamActual) * .18) calc(var(--tamActual) * .4); margin-left: calc(var(--tamActual) * .5); }
-  .now-label[hidden] { display: none; }
-  .now-text { background: var(--fondo); color: var(--color); font: 800 var(--tamActual)/1.15 var(--fuente); padding: calc(var(--tamActual) * .3) calc(var(--tamActual) * .5); border-left: calc(var(--tamActual) * .16) solid var(--acento); }
-  .now-text span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-wrap: balance; }
+  /* Titular actual, estilo noticiero: sello inclinado, barra con la etiqueta y franja con la hora y
+     el titular. Las medidas salen de --tamActual (T); --s es lo que se inclinan los cortes. */
+  .now {
+    --T: var(--tamActual); --s: calc(var(--T) * .32);
+    --abierto: polygon(0 0, 100% 0, calc(100% - var(--s)) 100%, 0 100%);
+    --cerrado: polygon(0 0, 0 0, 0 100%, 0 100%);
+    /* Colores (paleta clasica); las otras paletas los cambian más abajo. */
+    --sello: #ff6f8e, #d7263d 70%; --sello-color: #fff;
+    --cabeza: #1d3ad6, #19b5f0; --cabeza-color: #fff;
+    --hora-fondo: #fff; --hora-color: #1d3ad6;
+    --texto: #ffa41b, #ffd84a; --texto-color: #10164f;
+    --eco: #7fd8ff, #ffe48a;
+    position: fixed; left: calc(var(--T) * .6); right: calc(var(--T) * .6); bottom: calc(var(--alto) + var(--T) * .45);
+    display: flex; align-items: stretch;
+    font-family: "Barlow Semi Condensed", var(--fuente);
+    filter: drop-shadow(0 calc(var(--T) * .1) calc(var(--T) * .22) rgba(0, 0, 0, .4));
+  }
+  .now.arriba { top: calc(var(--alto) + var(--T) * .45); bottom: auto; }
+  .sello {
+    position: relative; z-index: 2; flex: none; display: flex; flex-direction: column; justify-content: center;
+    margin-right: calc(var(--s) * -1); padding: 0 calc(var(--T) * .5) 0 calc(var(--T) * .55);
+    background: linear-gradient(135deg, var(--sello)); color: var(--sello-color);
+    font: italic 900 calc(var(--T) * .66)/.92 "Barlow Semi Condensed", var(--fuente); text-transform: uppercase;
+    clip-path: polygon(var(--s) 0, 100% 0, calc(100% - var(--s)) 100%, 0 100%);
+    transform-origin: 30% 50%; transition: transform .3s ease, opacity .3s ease;
+  }
+  .sello span { width: min-content; }
+  .sello[hidden] { display: none; }
+  .cuerpo { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  /* Copia clara y corrida detrás de las barras, como en los zócalos de TV. */
+  .eco {
+    position: absolute; z-index: -1; inset: calc(var(--T) * .16) calc(var(--T) * -.28) calc(var(--T) * -.16) calc(var(--T) * .4);
+    background: linear-gradient(90deg, var(--eco)); opacity: .55; clip-path: var(--abierto);
+    transition: opacity .3s ease;
+  }
+  .cabeza {
+    padding: calc(var(--T) * .1) calc(var(--T) * 1.1) calc(var(--T) * .1) calc(var(--s) + var(--T) * .35);
+    background: linear-gradient(90deg, var(--cabeza)); color: var(--cabeza-color);
+    font: italic 800 calc(var(--T) * .5)/1.1 "Barlow Semi Condensed", var(--fuente); letter-spacing: .05em; text-transform: uppercase;
+    clip-path: var(--abierto); transition: clip-path .3s ease;
+  }
+  .cabeza[hidden] { display: none; }
+  .pie { width: 100%; display: flex; align-items: stretch; clip-path: var(--abierto); transition: clip-path .3s ease; }
+  .hora {
+    flex: none; display: flex; align-items: center; padding: 0 calc(var(--T) * .35) 0 calc(var(--s) + var(--T) * .3);
+    background: var(--hora-fondo); color: var(--hora-color); font: italic 800 calc(var(--T) * .55)/1 "Barlow Semi Condensed", var(--fuente);
+    font-variant-numeric: tabular-nums;
+  }
+  .hora[hidden] { display: none; }
+  .texto {
+    position: relative; flex: 1; min-width: 0; overflow: hidden;
+    padding: calc(var(--T) * .16) calc(var(--T) * .5 + var(--s)) calc(var(--T) * .16) calc(var(--T) * .4);
+    background: linear-gradient(90deg, var(--texto)); color: var(--texto-color);
+    font: 800 var(--T)/1.08 "Barlow Semi Condensed", var(--fuente);
+  }
+  /* Paletas sacadas de las referencias: "tv" (sello azul, barra rosa, franja amarilla) y "24" (sello
+     amarillo, barra rosa, franja azul), cada una con una variante. */
+  .now.paleta-tv { --sello: #1d3ad6, #19b5f0; --cabeza: #ff6f8e, #d7263d; --hora-color: #d7263d; --eco: #19b5f0, #1d3ad6; }
+  .now.paleta-tv-rosa { --sello: #1d3ad6, #19b5f0; --cabeza: #ffa41b, #ffd84a; --cabeza-color: #10164f; --hora-color: #d7263d;
+    --texto: #ff6f8e, #d7263d; --texto-color: #fff; --eco: #19b5f0, #1d3ad6; }
+  .now.paleta-24 { --sello: #ff9f1c, #ffc21a; --cabeza: #ff6f8e, #d7263d; --texto: #1d3ad6, #19b5f0; --texto-color: #fff; --eco: #ff8fb0, #ffc2d1; }
+  .now.paleta-24-calido { --sello: #ff9f1c, #ffc21a; --cabeza: #1d3ad6, #19b5f0; --hora-color: #d7263d;
+    --texto: #ff6f8e, #d7263d; --texto-color: #fff; --eco: #ffd84a, #ffe9a8; }
+  .hora[hidden] + .texto { padding-left: calc(var(--s) + var(--T) * .4); }
+  .texto span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-wrap: pretty; }
+  /* Brillo que cruza el titular cuando entra. */
+  .texto::after {
+    content: ""; position: absolute; inset: 0; transform: translateX(-110%);
+    background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .55) 50%, transparent 70%);
+  }
+  .now:not(.oculto) .texto::after { animation: brillo .9s ease-in-out .75s; }
+  @keyframes brillo { to { transform: translateX(110%); } }
+  /* Entra por partes (sello, barra, franja) y sale todo junto, en menos de los 400 ms del cambio. */
+  .now:not(.oculto) .sello { transition: transform .4s cubic-bezier(.3, 1.6, .5, 1), opacity .2s ease; }
+  .now:not(.oculto) .cabeza { transition: clip-path .4s cubic-bezier(.2, .8, .2, 1) .15s; }
+  .now:not(.oculto) .pie { transition: clip-path .5s cubic-bezier(.2, .8, .2, 1) .28s; }
+  .now:not(.oculto) .eco { transition: opacity .4s ease .6s; }
+  .now.oculto .sello { transform: scale(0); opacity: 0; }
+  .now.oculto .cabeza, .now.oculto .pie { clip-path: var(--cerrado); }
+  .now.oculto .eco { opacity: 0; }
 </style>
 </head>
 <body>
 <div class="now oculto" id="now" aria-live="polite">
-  <div class="now-label" id="nowLabel"></div>
-  <div class="now-text"><span id="nowText"></span></div>
+  <div class="sello" id="sello"></div>
+  <div class="cuerpo">
+    <div class="eco"></div>
+    <div class="cabeza" id="nowLabel"></div>
+    <div class="pie">
+      <div class="hora" id="hora"></div>
+      <div class="texto"><span id="nowText"></span></div>
+    </div>
+  </div>
 </div>
 <div class="bar vacia" id="bar">
   <div class="label" id="label"></div>
@@ -83,6 +171,18 @@
   const nowLabel = document.getElementById("nowLabel");
   nowLabel.textContent = ahora;
   nowLabel.hidden = !ahora;
+  const sello = document.getElementById("sello");
+  const textoSello = q.has("sello") ? q.get("sello").trim() : "En vivo";
+  for (const palabra of textoSello.split(/\s+/).filter(Boolean)) sello.append(Object.assign(document.createElement("span"), { textContent: palabra }));
+  sello.hidden = !textoSello;
+  const hora = document.getElementById("hora");
+  hora.hidden = no("hora");
+  const paleta = q.get("paleta") || "";
+  if (/^(tv|tv-rosa|24|24-calido)$/.test(paleta)) document.getElementById("now").classList.add(`paleta-${paleta}`);
+  if (paleta === "tv-rosa" && !q.has("acento")) document.getElementById("bar").classList.add("paleta-tv-rosa");
+  const reloj = new Intl.DateTimeFormat("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Santiago" });
+  const tic = () => { hora.textContent = reloj.format(new Date()); };
+  if (!hora.hidden) { tic(); setInterval(tic, 10_000); }
   const AVISO = (q.get("aviso") || "").trim().slice(0, 200);
   const CADA = num("cada", 5, 1, 100);
   const etiqueta = q.has("etiqueta") ? q.get("etiqueta") : "Titulares";

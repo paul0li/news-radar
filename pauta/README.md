@@ -96,6 +96,9 @@ Optional URL parameters:
 | `actual` | `si` | `no` hides the current story. |
 | `tamactual` | `tam × 1.5` | Font size of the current story in px. |
 | `ahora` | `Ahora` | Label above the current story; empty (`ahora=`) hides it. |
+| `sello` | `En vivo` | Slanted badge left of the current story; empty (`sello=`) hides it. |
+| `hora` | `si` | `no` hides the Chile time (HH:MM) next to the current story. |
+| `paleta` | `clasica` | Colors of the current story: `clasica`, `tv`, `tv-rosa`, `24` or `24-calido`. With `tv-rosa` the strip's label turns pink and the notice blue (unless `acento` is set); its background stays black. |
 | `franja` | `si` | `no` hides the bar and shows only the current story, so it can live in its own OBS source (full screen) that you show and hide separately. |
 
 Example: `/ticker?tam=48&velocidad=120&etiqueta=Hoy`. The data comes from `GET /api/ticker`
