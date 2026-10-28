@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { parseLinks, domainOf } from "./parse.js";
-import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem, removeItem } from "./store.js";
+import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem, editItem, removeItem } from "./store.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -252,10 +252,11 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Borrar una noticia: DELETE /api/pautas/:id/items/:itemId
+  // Editar el titular (PATCH) o borrar una noticia (DELETE): /api/pautas/:id/items/:itemId
   const di = path.match(/^\/api\/pautas\/([^/]+)\/items\/(\d+)$/);
-  if (di && req.method === "DELETE") {
+  if (di && (req.method === "DELETE" || req.method === "PATCH")) {
     try {
+      if (req.method === "PATCH") return send(res, 200, await editItem(di[1], Number(di[2]), await readBody(req)));
       return send(res, 200, { pauta: await removeItem(di[1], Number(di[2])) });
     } catch (err) {
       if (!err.status) console.error(err);

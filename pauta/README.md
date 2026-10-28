@@ -130,6 +130,7 @@ All endpoints use the same auth as the page.
 | `GET /api/pautas/:id` | | `{ pauta }` |
 | `PUT /api/pautas/:id` | `{ order?, done?, actual? }` | `{ pauta }`. `order` must be a permutation of all item ids; `done` is the full list of opened item ids; `actual` is the id of the story being discussed (or `null`). |
 | `DELETE /api/pautas/:id` | | `{ ok: true }` |
+| `PATCH /api/pautas/:id/items/:itemId` | `{ titulo }` | `{ pauta, item }`. Edits the headline shown on screen; an empty `titulo` restores the original title. |
 
 A pauta is `{ id, createdAt, updatedAt, criterio, actual, items: [{ id, title, titulo, url, domain, tono, done }] }`;
 the order of `items` is the running order. Invalid input returns `400`, unknown ids `404`, both as `{ error }`.

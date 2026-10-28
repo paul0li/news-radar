@@ -105,7 +105,7 @@
   .p-end-t { font: 700 22px Georgia, serif; margin: 0 0 6px; }
   .p-end .status { margin: 0 0 14px; }
   .plist { list-style: none; padding: 0; margin: 0; }
-  .plist > li { position: relative; display: grid; grid-template-columns: 36px 30px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; min-height: 72px; background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--neutral); border-radius: 10px; padding: 14px 16px 14px 14px; margin-bottom: 12px; cursor: pointer; transition: background-color .15s; }
+  .plist > li { position: relative; display: grid; grid-template-columns: 36px 30px minmax(0, 1fr) auto auto auto; gap: 12px; align-items: center; min-height: 72px; background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--neutral); border-radius: 10px; padding: 14px 16px 14px 14px; margin-bottom: 12px; cursor: pointer; transition: background-color .15s; }
   .plist > li:hover { background: var(--neutral-bg); }
   .plist > li.gracioso { border-left-color: var(--fun); }
   .plist > li.serio { border-left-color: var(--serious); }
@@ -125,6 +125,11 @@
   /* Borrar noticia: queda por encima del link que cubre la fila */
   .del { position: relative; z-index: 1; width: 44px; min-height: 44px; margin: -8px -8px -8px -4px; padding: 0; background: transparent; color: var(--muted); font: 400 24px/1 system-ui, sans-serif; border-radius: 8px; }
   .del:hover { color: var(--err); background: var(--neutral-bg); }
+  /* Editar titular: el lápiz y el campo quedan por encima del link que cubre la fila */
+  .edit { position: relative; z-index: 1; width: 44px; min-height: 44px; margin: -8px -8px -8px 0; padding: 0; background: transparent; color: var(--muted); font: 400 20px/1 system-ui, sans-serif; border-radius: 8px; }
+  .edit:hover { color: var(--ink); background: var(--neutral-bg); }
+  .edit:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .plist .t input.titulo-edit { position: relative; z-index: 1; padding: 6px 8px; font: 600 17px/1.3 system-ui, sans-serif; border-color: var(--accent); cursor: text; }
   .del:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .plist.is-dragging { user-select: none; -webkit-user-select: none; }
@@ -139,9 +144,10 @@
     .plist.is-dragging > li:not(.dragging) { transition: none; }
   }
   @media (max-width: 420px) {
-    .plist > li { grid-template-columns: 36px 24px minmax(0, 1fr) auto; gap: 10px; }
+    .plist > li { grid-template-columns: 36px 24px minmax(0, 1fr) auto auto; gap: 10px; }
     .plist > li .tag { grid-column: 3; justify-self: start; }
-    .plist > li .del { grid-column: 4; grid-row: 1 / span 2; }
+    .plist > li .edit { grid-column: 4; grid-row: 1 / span 2; }
+    .plist > li .del { grid-column: 5; grid-row: 1 / span 2; }
   }
 </style>
 </head>
@@ -424,7 +430,7 @@
       const li = document.createElement("li");
       li.className = it.tono + (it.done ? " done" : "") + (it.ultimo ? " ultimo" : "");
       li.dataset.id = it.id;
-      li.innerHTML = `<button type="button" class="grip" aria-label="Mover">⋮⋮</button><div class="n"></div><div class="t"><a target="_blank" rel="noopener noreferrer"></a><div class="meta"></div></div><span class="tag"></span><button type="button" class="del">×</button>`;
+      li.innerHTML = `<button type="button" class="grip" aria-label="Mover">⋮⋮</button><div class="n"></div><div class="t"><a target="_blank" rel="noopener noreferrer"></a><div class="meta"></div></div><span class="tag"></span><button type="button" class="edit">✎</button><button type="button" class="del">×</button>`;
       li.querySelector(".n").textContent = i + 1;
       const a = li.querySelector("a");
       // No hacer preventDefault: el navegador abre la pestaña y después escondemos el link.
@@ -441,6 +447,10 @@
       if (it.ultimo) meta.append(Object.assign(document.createElement("b"), { textContent: "Último minuto" }), it.domain ? ` · ${it.domain}` : "");
       else meta.textContent = it.domain;
       li.querySelector(".tag").textContent = it.tono;
+      const edit = li.querySelector(".edit");
+      edit.title = "Editar titular";
+      edit.setAttribute("aria-label", `Editar «${it.titulo || it.title}»`);
+      edit.addEventListener("click", () => editTitular(it, li));
       const del = li.querySelector(".del");
       del.title = "Borrar noticia";
       del.setAttribute("aria-label", `Borrar «${it.titulo || it.title}»`);
@@ -732,6 +742,57 @@
       $("umAdd").disabled = false;
     }
   });
+
+  /* ---------- Editar el titular: Enter o salir del campo guarda, Esc cancela ---------- */
+
+  function editTitular(it, li) {
+    const a = li.querySelector(".t a");
+    if (!a || li.querySelector(".titulo-edit")) return;
+    const p = current;
+    const input = document.createElement("input");
+    input.className = "titulo-edit";
+    input.maxLength = 300;
+    input.value = it.titulo || it.title;
+    input.setAttribute("aria-label", "Titular");
+    input.title = `Original: ${it.title} (vacío vuelve al original)`;
+    a.hidden = true;
+    a.before(input);
+    input.focus();
+    input.select();
+    let closed = false;
+    const close = async (guardar) => {
+      if (closed) return;
+      closed = true;
+      const titulo = input.value.replace(/\s+/g, " ").trim();
+      if (!guardar || titulo === (it.titulo || it.title)) {
+        input.remove();
+        a.hidden = false;
+        return;
+      }
+      input.disabled = true;
+      try {
+        await saving; // que el orden y los vistos pendientes lleguen antes
+        const { item } = await api(`api/pautas/${encodeURIComponent(p.id)}/items/${it.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ titulo }),
+        });
+        it.titulo = item.titulo;
+        if (current === p) {
+          renderList();
+          status(titulo ? "Titular editado." : "Titular original restaurado.");
+        }
+      } catch (e) {
+        input.remove();
+        a.hidden = false;
+        if (current === p) status(e.message, true);
+      }
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); close(true); }
+      else if (e.key === "Escape") { e.preventDefault(); close(false); }
+    });
+    input.addEventListener("blur", () => close(true));
+  }
 
   /* ---------- Borrar una noticia ---------- */
 

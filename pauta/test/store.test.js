@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem, removeItem } from "../store.js";
+import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem, editItem, removeItem } from "../store.js";
 
 let dir;
 before(async () => {
@@ -123,4 +123,18 @@ test("ids inválidos se rechazan antes de tocar el disco", async () => {
     await assert.rejects(updatePauta(id, {}), (e) => e.status === 400);
     await assert.rejects(deletePauta(id), (e) => e.status === 400);
   }
+});
+
+test("editItem cambia el titular; vacío vuelve al título original", async () => {
+  const p = await createPauta({ items });
+  await updatePauta(p.id, { order: [3, 1, 4, 2], done: [1] });
+  const { pauta, item } = await editItem(p.id, 1, { titulo: "  Perro   se roba un pollo " });
+  assert.equal(item.titulo, "Perro se roba un pollo");
+  assert.deepEqual(pauta.items.map((it) => [it.id, it.done]), [[3, false], [1, true], [4, false], [2, false]]);
+  assert.deepEqual(await getPauta(p.id), pauta);
+  assert.equal((await editItem(p.id, 1, { titulo: "  " })).item.titulo, item.title);
+  await assert.rejects(editItem(p.id, 9, { titulo: "x" }), (e) => e.status === 404);
+  await assert.rejects(editItem(p.id, 1, {}), (e) => e.status === 400);
+  await assert.rejects(editItem(p.id, 1, { titulo: "x".repeat(301) }), (e) => e.status === 400);
+  await assert.rejects(editItem("../x", 1, { titulo: "x" }), (e) => e.status === 400);
 });

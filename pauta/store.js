@@ -149,6 +149,22 @@ export async function addItem(id, { title, titulo, url = "", domain = "", tono =
   });
 }
 
+// Cambia el titular que se muestra (`titulo`); vacío vuelve al título original.
+export async function editItem(id, itemId, { titulo } = {}) {
+  fileOf(id);
+  if (typeof titulo !== "string") throw httpError(400, '"titulo" debe ser texto.');
+  const limpio = titulo.replace(/\s+/g, " ").trim();
+  if (limpio.length > 300) throw httpError(400, "El titular es demasiado largo.");
+  return withLock(id, async () => {
+    const pauta = await getPauta(id);
+    const item = pauta.items.find((it) => it.id === itemId);
+    if (!item) throw httpError(404, "Esa noticia no está en la pauta.");
+    item.titulo = limpio || item.title;
+    pauta.updatedAt = new Date().toISOString();
+    return { pauta: await save(pauta), item };
+  });
+}
+
 // Saca una noticia de la pauta; las demás conservan su orden y si ya se vieron.
 export async function removeItem(id, itemId) {
   fileOf(id);

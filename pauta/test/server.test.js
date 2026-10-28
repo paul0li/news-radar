@@ -116,3 +116,18 @@ test("borrar una noticia de la pauta", async () => {
   assert.equal((await api(`/api/pautas/20000101-000000-abcd/items/1`, null, "DELETE")).status, 404);
   assert.equal((await api(`/api/pautas/nope/items/1`, null, "DELETE")).status, 400);
 });
+
+test("editar el titular de una noticia", async () => {
+  const p = await armarPauta();
+  const it = p.items[0];
+  const { status, data } = await api(`/api/pautas/${p.id}/items/${it.id}`, { titulo: "Titular a mano" }, "PATCH");
+  assert.equal(status, 200);
+  assert.equal(data.item.titulo, "Titular a mano");
+  assert.equal(data.item.title, it.title); // el original no se toca
+  const { data: guardada } = await api(`/api/pautas/${p.id}`);
+  assert.equal(guardada.pauta.items[0].titulo, "Titular a mano");
+
+  assert.equal((await api(`/api/pautas/${p.id}/items/99`, { titulo: "x" }, "PATCH")).status, 404);
+  assert.equal((await api(`/api/pautas/${p.id}/items/${it.id}`, { titulo: 5 }, "PATCH")).status, 400);
+  assert.equal((await api(`/api/pautas/nope/items/1`, { titulo: "x" }, "PATCH")).status, 400);
+});
