@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem, editItem, removeItem } from "../store.js";
+import {
+  createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem, editItem, removeItem,
+  hoyChile, getExtras, crearExtras, sacarGalletita, editarGalletita, guardarHoroscopo, horoscopoPara,
+} from "../store.js";
 
 let dir;
 before(async () => {
@@ -137,4 +140,68 @@ test("editItem cambia el titular; vacío vuelve al título original", async () =
   await assert.rejects(editItem(p.id, 1, {}), (e) => e.status === 400);
   await assert.rejects(editItem(p.id, 1, { titulo: "x".repeat(301) }), (e) => e.status === 400);
   await assert.rejects(editItem("../x", 1, { titulo: "x" }), (e) => e.status === 400);
+});
+
+test("galletitas: las 15 salen una vez antes de repetir, y cada donación conserva la suya", async () => {
+  const fecha = "2026-11-02";
+  await assert.rejects(sacarGalletita(fecha, { donacion: "d0" }), { status: 409 });
+  const textos = Array.from({ length: 15 }, (_, i) => `G${i + 1}`);
+  await crearExtras(fecha, { tema: "lluvia", galletitas: textos });
+
+  const vistas = new Set();
+  for (let i = 0; i < 15; i++) {
+    const r = await sacarGalletita(fecha, { donacion: `d${i}`, usuario: `@u${i}` });
+    assert.equal(r.nueva, true);
+    assert.equal(r.sinUsar, 14 - i);
+    vistas.add(r.galleta.id);
+  }
+  assert.equal(vistas.size, 15); // ninguna repetida mientras quedaban sin usar
+
+  // La misma donación recibe la misma galletita, sin gastar otra.
+  const otra = await sacarGalletita(fecha, { donacion: "d3" });
+  assert.equal(otra.nueva, false);
+  assert.ok(otra.galleta.usos.some((u) => u.donacion === "d3" && u.usuario === "@u3"));
+
+  // Con más de 15 donaciones se repiten, de a una vuelta.
+  const r16 = await sacarGalletita(fecha, { donacion: "d15" });
+  assert.equal(r16.galleta.usos.length, 2);
+  assert.equal((await getExtras(fecha)).galletitas.reduce((n, g) => n + g.usos.length, 0), 16);
+
+  // Generarlas de nuevo empieza de cero.
+  await crearExtras(fecha, { tema: "sol", galletitas: textos });
+  assert.ok((await getExtras(fecha)).galletitas.every((g) => g.usos.length === 0));
+  await assert.rejects(async () => sacarGalletita(fecha, { donacion: "" }), { status: 400 });
+  await assert.rejects(async () => sacarGalletita("ayer", { donacion: "x" }), { status: 400 });
+});
+
+test("editar una galletita, también la que ya se entregó", async () => {
+  const fecha = "2026-11-03";
+  await crearExtras(fecha, { tema: "x", galletitas: ["A", "B", "C"] });
+  const { galleta } = await sacarGalletita(fecha, { donacion: "d1" });
+  const { galleta: editada } = await editarGalletita(fecha, galleta.id, { texto: "  Nueva   versión " });
+  assert.equal(editada.texto, "Nueva versión");
+  assert.equal(editada.usos.length, 1); // conserva a quién le tocó
+  assert.equal((await sacarGalletita(fecha, { donacion: "d1" })).galleta.texto, "Nueva versión");
+  await assert.rejects(async () => editarGalletita(fecha, galleta.id, { texto: "  " }), { status: 400 });
+  await assert.rejects(async () => editarGalletita(fecha, galleta.id, {}), { status: 400 });
+  await assert.rejects(async () => editarGalletita(fecha, 99, { texto: "x" }), { status: 404 });
+  await assert.rejects(async () => editarGalletita("2026-01-01", 1, { texto: "x" }), { status: 404 });
+});
+
+test("horóscopo: el del día, o el más cercano guardado", async () => {
+  const h = (fecha) => ({ fuente: "Yolanda Sultana", url: "u", fecha, titulo: fecha, signos: [] });
+  assert.equal(await horoscopoPara("2027-01-10"), null);
+  await guardarHoroscopo(h("2027-01-08"));
+  await guardarHoroscopo(h("2027-01-11"));
+  assert.equal((await horoscopoPara("2027-01-08")).fecha, "2027-01-08");
+  assert.equal((await horoscopoPara("2027-01-10")).fecha, "2027-01-11"); // a 1 día
+  assert.equal((await horoscopoPara("2027-01-09")).fecha, "2027-01-08"); // empate: el anterior
+  assert.equal(await horoscopoPara("2027-01-20"), null); // nada a menos de 3 días
+  // No se mezcla con el historial de pautas.
+  assert.ok((await listPautas()).every((p) => /^\d{8}-/.test(p.id)));
+});
+
+test("hoyChile usa la hora de Chile", () => {
+  assert.equal(hoyChile(new Date("2026-11-02T02:30:00Z")), "2026-11-01"); // 23:30 en Chile
+  assert.equal(hoyChile(new Date("2026-11-02T03:30:00Z")), "2026-11-02");
 });

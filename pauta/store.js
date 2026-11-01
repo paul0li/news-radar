@@ -1,7 +1,7 @@
 // Historial de pautas: un archivo JSON por pauta en DATA_DIR (fuera del repo en producción).
 import { mkdir, readFile, writeFile, rename, readdir, unlink } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ID_RE = /^\d{8}-\d{6}-[0-9a-f]{4}$/;
@@ -186,4 +186,111 @@ export async function deletePauta(id) {
     if (err.code === "ENOENT") throw httpError(404, "Pauta no encontrada.");
     throw err;
   }
+}
+
+// ---------- Galletitas de la suerte y horóscopo del día ----------
+// DATA_DIR/extras/<fecha>.json (tema = el pedido de quien conduce; origen = "generadas" | "pegadas"):
+//   { fecha, tema, origen, createdAt, galletitas: [{ id, texto, usos: [{ donacion, usuario, at }] }] }
+// DATA_DIR/horoscopo/<fecha>.json: { fuente, url, fecha, titulo, signos: [{ signo, nombre, fechas, texto }] }
+// La fecha es la de Chile (YYYY-MM-DD).
+
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function hoyChile(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(date);
+}
+
+function archivoDia(carpeta, fecha) {
+  if (typeof fecha !== "string" || !FECHA_RE.test(fecha)) throw httpError(400, "Fecha inválida.");
+  return join(dataDir(), carpeta, `${fecha}.json`);
+}
+
+async function leer(file) {
+  try {
+    return JSON.parse(await readFile(file, "utf8"));
+  } catch (err) {
+    if (err.code === "ENOENT") return null;
+    throw err;
+  }
+}
+
+async function escribir(file, data) {
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(`${file}.tmp`, JSON.stringify(data, null, 2));
+  await rename(`${file}.tmp`, file);
+  return data;
+}
+
+export const getExtras = (fecha) => leer(archivoDia("extras", fecha));
+
+// Galletitas nuevas para el día: reemplazan las anteriores (y quién las sacó).
+export function crearExtras(fecha, { tema = "", origen = "generadas", galletitas }) {
+  const file = archivoDia("extras", fecha);
+  return withLock(`extras-${fecha}`, () =>
+    escribir(file, {
+      fecha,
+      tema,
+      origen,
+      createdAt: new Date().toISOString(),
+      galletitas: galletitas.map((texto, i) => ({ id: i + 1, texto, usos: [] })),
+    }),
+  );
+}
+
+// Le da una galletita a una donación: la misma si ya tenía una; si no, una al azar entre las menos
+// usadas (las 15 salen una vez antes de repetir alguna).
+export function sacarGalletita(fecha, { donacion, usuario = "" }) {
+  const file = archivoDia("extras", fecha);
+  if (typeof donacion !== "string" || !donacion.trim()) throw httpError(400, '"donacion" debe ser el id de la donación.');
+  return withLock(`extras-${fecha}`, async () => {
+    const extras = await leer(file);
+    if (!extras?.galletitas?.length) throw httpError(409, "Todavía no hay galletitas de hoy: genéralas en la pauta.");
+    const ya = extras.galletitas.find((g) => g.usos.some((u) => u.donacion === donacion));
+    if (ya) return { galleta: ya, nueva: false, sinUsar: extras.galletitas.filter((g) => !g.usos.length).length };
+    const menos = Math.min(...extras.galletitas.map((g) => g.usos.length));
+    const opciones = extras.galletitas.filter((g) => g.usos.length === menos);
+    const galleta = opciones[Math.floor(Math.random() * opciones.length)];
+    galleta.usos.push({ donacion, usuario: String(usuario).slice(0, 100), at: new Date().toISOString() });
+    await escribir(file, extras);
+    return { galleta, nueva: true, sinUsar: extras.galletitas.filter((g) => !g.usos.length).length };
+  });
+}
+
+// Cambia el texto de una galletita (también para las donaciones que ya la recibieron).
+export function editarGalletita(fecha, id, { texto } = {}) {
+  const file = archivoDia("extras", fecha);
+  if (typeof texto !== "string") throw httpError(400, '"texto" debe ser texto.');
+  const limpio = texto.replace(/\s+/g, " ").trim();
+  if (!limpio) throw httpError(400, "La galletita no puede quedar vacía.");
+  if (limpio.length > 300) throw httpError(400, "La galletita es demasiado larga.");
+  return withLock(`extras-${fecha}`, async () => {
+    const extras = await leer(file);
+    const galleta = extras?.galletitas?.find((g) => g.id === id);
+    if (!galleta) throw httpError(404, "Esa galletita no está en las de hoy.");
+    galleta.texto = limpio;
+    await escribir(file, extras);
+    return { galleta };
+  });
+}
+
+export const guardarHoroscopo = (h) => escribir(archivoDia("horoscopo", h.fecha), h);
+
+// El horóscopo de ese día; si no hay (p. ej. no salió el fin de semana), el más cercano guardado
+// dentro de 3 días, prefiriendo uno anterior. null si no hay ninguno.
+export async function horoscopoPara(fecha) {
+  archivoDia("horoscopo", fecha);
+  let files;
+  try {
+    files = await readdir(join(dataDir(), "horoscopo"));
+  } catch (err) {
+    if (err.code === "ENOENT") return null;
+    throw err;
+  }
+  const dia = (f) => Date.parse(`${f}T00:00:00Z`) / 86_400_000;
+  const fechas = files.filter((f) => f.endsWith(".json") && FECHA_RE.test(f.slice(0, -5))).map((f) => f.slice(0, -5));
+  const elegida = fechas
+    .map((f) => ({ f, d: dia(f) - dia(fecha) }))
+    .filter(({ d }) => Math.abs(d) <= 3)
+    .sort((a, b) => Math.abs(a.d) - Math.abs(b.d) || a.d - b.d)[0];
+  return elegida ? leer(archivoDia("horoscopo", elegida.f)) : null;
 }

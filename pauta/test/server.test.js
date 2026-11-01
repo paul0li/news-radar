@@ -5,14 +5,20 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import http from "node:http";
+import { articulo } from "./horoscopo-fixture.js";
 
 // Levanta el server de verdad con el Claude falso (test/fake-claude.js) y un DATA_DIR temporal.
-let dir, server, base;
+// El horóscopo sale de un servidor local con un artículo de prueba con la fecha de hoy.
+let dir, server, base, sitio;
+const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(new Date());
 before(async () => {
   dir = await mkdtemp(join(tmpdir(), "pauta-server-test-"));
+  sitio = http.createServer((req, res) => res.end(articulo(hoy))).listen(0, "127.0.0.1");
+  await new Promise((r) => sitio.once("listening", r));
   server = spawn(process.execPath, ["server.js"], {
     cwd: fileURLToPath(new URL("..", import.meta.url)),
-    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", DATA_DIR: dir, APP_PASSWORD: "", CLAUDE_BIN: "./test/fake-claude.js", FAKE_DELAY_MS: "0" },
+    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", DATA_DIR: dir, APP_PASSWORD: "", CLAUDE_BIN: "./test/fake-claude.js", FAKE_DELAY_MS: "0", HOROSCOPO_URL: `http://127.0.0.1:${sitio.address().port}/` },
     stdio: ["ignore", "pipe", "inherit"],
   });
   base = await new Promise((resolve, reject) => {
@@ -27,6 +33,7 @@ before(async () => {
 });
 after(async () => {
   server?.kill();
+  sitio?.close();
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -130,4 +137,46 @@ test("editar el titular de una noticia", async () => {
   assert.equal((await api(`/api/pautas/${p.id}/items/99`, { titulo: "x" }, "PATCH")).status, 404);
   assert.equal((await api(`/api/pautas/${p.id}/items/${it.id}`, { titulo: 5 }, "PATCH")).status, 400);
   assert.equal((await api(`/api/pautas/nope/items/1`, { titulo: "x" }, "PATCH")).status, 400);
+});
+
+test("galletitas y horóscopo del día", async () => {
+  assert.equal((await api("/api/extras", {})).status, 400); // sin tema
+  assert.equal((await api("/api/extras", { tema: "x".repeat(4001) })).status, 400);
+  assert.equal((await api("/api/extras/galletita", { donacion: "d1" })).status, 409); // aún no hay
+
+  const { status, data } = await api("/api/extras", { tema: "  Hágame 15 frases sobre el frío " });
+  assert.equal(status, 200);
+  assert.equal(data.fecha, hoy);
+  assert.equal(data.tema, "Hágame 15 frases sobre el frío"); // el pedido, tal cual
+  assert.equal(data.origen, "generadas");
+  assert.equal(data.galletitas.length, 15);
+  assert.equal(data.galletitas[0].texto, "(fake) Galletita 1: Hágame 15 frases sobre el frío");
+  assert.equal(data.horoscopo.fecha, hoy);
+  assert.equal(data.horoscopo.signos.length, 12);
+  assert.equal(data.errorHoroscopo, null);
+
+  const g = await api("/api/extras/galletita", { donacion: "d1", usuario: "@ana" });
+  assert.equal(g.status, 200);
+  assert.equal(g.data.nueva, true);
+  assert.equal(g.data.sinUsar, 14);
+  assert.equal((await api("/api/extras/galletita", { donacion: "d1" })).data.galleta.id, g.data.galleta.id);
+
+  const { data: leidas } = await api("/api/extras");
+  assert.deepEqual(leidas.galletitas.find((x) => x.id === g.data.galleta.id).usos.map((u) => u.usuario), ["@ana"]);
+  assert.equal((await api("/api/extras/horoscopo", {})).data.horoscopo.signos[0].signo, "aries");
+
+  // Editarla cambia lo que recibe la misma donación.
+  const ed = await api(`/api/extras/galletitas/${g.data.galleta.id}`, { texto: "Editada a mano" }, "PATCH");
+  assert.equal(ed.status, 200);
+  assert.equal((await api("/api/extras/galletita", { donacion: "d1" })).data.galleta.texto, "Editada a mano");
+  assert.equal((await api("/api/extras/galletitas/99", { texto: "x" }, "PATCH")).status, 404);
+
+  // Pegadas desde otra IA: reemplazan a las del día, con lo que haya (no tienen que ser 15).
+  const pegadas = await api("/api/extras/pegar", { texto: "Aquí tienes:\n1. Primera galletita pegada\n2. Segunda galletita pegada" });
+  assert.equal(pegadas.status, 200);
+  assert.deepEqual(pegadas.data.galletitas.map((x) => x.texto), ["Primera galletita pegada", "Segunda galletita pegada"]);
+  assert.equal(pegadas.data.origen, "pegadas");
+  assert.equal(pegadas.data.tema, "");
+  assert.equal((await api("/api/extras/galletita", { donacion: "d9" })).status, 200);
+  assert.equal((await api("/api/extras/pegar", { texto: "   " })).status, 400);
 });
