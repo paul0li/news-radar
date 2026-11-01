@@ -6,7 +6,11 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { parseLinks, domainOf } from "./parse.js";
-import { createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem, editItem, removeItem } from "./store.js";
+import {
+  createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem, editItem, removeItem,
+  hoyChile, getExtras, crearExtras, sacarGalletita, editarGalletita, guardarHoroscopo, horoscopoPara,
+} from "./store.js";
+import { ultimoHoroscopo } from "./horoscopo.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -30,17 +34,14 @@ Reglas:
 - Agrupa temas relacionados solo si se potencian; evita repetir el mismo tema seguido.
 - No cuentes chistes sobre tragedias: si hay una muerte o desgracia, no pongas inmediatamente antes algo burlón del mismo tema.
 - Solo puedes usar los ids entregados. Incluye cada id exactamente una vez.
-- "titulo": reescribe SIEMPRE el título para leerlo en pantalla durante la transmisión. Los originales los escribió el editor a la rápida (con faltas, abreviaciones o sin contexto); no los copies tal cual.
-  - Que den ganas de verlo: con gancho y ritmo, en español de Chile natural, claro y breve (máx. ~90 caracteres). Corrige ortografía y mayúsculas.
-  - Fiel al original: no inventes datos, cifras, nombres ni detalles que no estén en el título original. Mantén los nombres propios.
-  - Ajusta el tono a la noticia: con humor e ingenio si es gracioso; sobrio, claro y respetuoso si es serio (nunca bromas sobre muertes, tragedias o víctimas).
-  - Sin clickbait engañoso, sin MAYÚSCULAS sostenidas y sin emojis.
+- "titulo": el título que se lee en pantalla. Es el título original con la ortografía corregida, nada más.
+  - Corrige solo ortografía, tildes, mayúsculas y puntuación. Usa las mismas palabras, en el mismo orden: no agregues, quites, cambies ni reordenes palabras, y no expandas abreviaciones ni siglas.
   - Si el original es solo un dominio o una URL, escribe un título neutro y breve basado en eso, sin inventar el contenido.
   - Ejemplos:
-    "perro roba pollo noticiero vivo" → "El perro que se robó el show (y un pollo) en pleno noticiero"
-    "gato abre refri" → "Este gato aprendió a abrir el refri y ya nada está a salvo"
-    "bc sube tasa 6%" → "El Banco Central sube la tasa de interés a 6%"
-    "temblor antofa 2 muertos" → "Temblor en Antofagasta deja dos fallecidos"`;
+    "perro roba pollo en noticiero en vivo" → "Perro roba pollo en noticiero en vivo"
+    "el gato q abrio el refri" → "El gato q abrió el refri"
+    "bc sube tasa al 6%" → "BC sube tasa al 6%"
+    "temblor en antofagasta deja 2 muertos" → "Temblor en Antofagasta deja 2 muertos"`;
 
 const SCHEMA = {
   type: "object",
@@ -63,16 +64,35 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
+// Galletitas de la suerte: el pedido lo escribe quien conduce, con sus propias instrucciones.
+// Estos prompts solo piden el formato (una frase por elemento), nunca el contenido.
+const GALLETITAS_MAX = 50;
+const PEDIDO_MAX = 4000;
+
+const SYSTEM_GENERAR = `Redacta lo que te pidan, tal como lo pidan. Entrega cada frase como un elemento separado de "galletitas", sin numerarlas.`;
+
+const SYSTEM_SEPARAR = `Te pegan un texto con frases tipo galleta de la suerte, probablemente copiado de otra IA.
+Devuelve cada frase como un elemento de "galletitas", copiada tal cual: no cambies, corrijas, agregues ni quites palabras.
+Quita solo la numeración, las viñetas, el formato (negritas, comillas que envuelven la frase) y lo que no es una frase (introducciones, títulos, cierres como "¿Quieres más?").`;
+
+const SCHEMA_GALLETITAS = {
+  type: "object",
+  properties: { galletitas: { type: "array", items: { type: "string" } } },
+  required: ["galletitas"],
+  additionalProperties: false,
+};
+
 // Llama a Claude Code en modo headless (`claude -p`), usando la sesión/suscripción de la máquina.
-function runClaude(prompt) {
+// `buscar` le deja a Claude la búsqueda web (WebSearch) por si el pedido la necesita; si no, corre sin herramientas.
+function runClaude(prompt, { schema = SCHEMA, system = SYSTEM, buscar = false } = {}) {
   const args = [
     "-p",
     "--output-format", "json",
-    "--json-schema", JSON.stringify(SCHEMA),
-    "--system-prompt", SYSTEM,
+    "--json-schema", JSON.stringify(schema),
+    "--system-prompt", system,
     "--model", MODEL,
     "--effort", EFFORT,
-    "--tools", "",
+    ...(buscar ? ["--tools", "WebSearch", "--allowedTools", "WebSearch"] : ["--tools", ""]),
     "--setting-sources", "",
     "--strict-mcp-config",
     "--no-session-persistence",
@@ -113,15 +133,54 @@ async function ordenar(items, criterio) {
   return orden;
 }
 
-// Último minuto: la IA redacta el titular con las mismas reglas que el resto de la pauta.
+// Último minuto: la IA corrige el titular con las mismas reglas que el resto de la pauta.
 // El id 0 es provisorio; el store le asigna el definitivo al guardarla.
 async function redactarUltimoMinuto(titular, url) {
   const item = { id: 0, title: titular, url, domain: url ? domainOf(url) : "" };
   const { orden } = await runClaude(
-    `Noticia de último minuto para sumar a una pauta ya armada. Va primera: solo redacta su título y clasifica su tono.\n` +
+    `Noticia de último minuto para sumar a una pauta ya armada. Va primera: solo corrige la ortografía de su título y clasifica su tono.\n` +
       `${item.id}. ${item.title} (${item.domain || "sin link"})`,
   );
   return reconciliar([item], orden)[0];
+}
+
+// Galletitas del día: `generar` le pasa el pedido de quien conduce tal cual; si no, Claude solo
+// separa en frases un texto pegado (escrito en otra IA), sin cambiarlas.
+async function galletitasDe(texto, { generar }) {
+  const { galletitas } = await runClaude(texto, {
+    schema: SCHEMA_GALLETITAS,
+    system: generar ? SYSTEM_GENERAR : SYSTEM_SEPARAR,
+    buscar: generar,
+  });
+  const limpias = [...new Set((galletitas || []).map((g) => String(g).replace(/\s+/g, " ").trim()).filter(Boolean))];
+  if (!limpias.length) throw Object.assign(new Error(generar ? "Claude no devolvió galletitas. Prueba de nuevo." : "No encontré galletitas en el texto pegado."), { status: 400 });
+  if (limpias.length > GALLETITAS_MAX) throw Object.assign(new Error(`Son ${limpias.length} galletitas: el máximo es ${GALLETITAS_MAX}.`), { status: 400 });
+  return limpias.map((g) => g.slice(0, 300));
+}
+
+// Trae el último horóscopo publicado y lo guarda con su fecha. Devuelve el error como texto, sin lanzarlo.
+async function actualizarHoroscopo() {
+  try {
+    await guardarHoroscopo(await ultimoHoroscopo());
+    return null;
+  } catch (err) {
+    console.warn("Horóscopo:", err.message);
+    return err.message;
+  }
+}
+
+async function extrasDeHoy(errorHoroscopo = null) {
+  const fecha = hoyChile();
+  const extras = await getExtras(fecha);
+  return {
+    fecha,
+    tema: extras?.tema ?? "",
+    origen: extras?.origen ?? null,
+    createdAt: extras?.createdAt ?? null,
+    galletitas: extras?.galletitas ?? [],
+    horoscopo: await horoscopoPara(fecha),
+    errorHoroscopo,
+  };
 }
 
 // Garantiza una permutación válida: descarta ids inventados/duplicados y agrega al final los que falten.
@@ -232,6 +291,37 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Galletitas de la suerte y horóscopo del día (los pide el panel de donaciones de OBS).
+  if (path.startsWith("/api/extras")) {
+    try {
+      if (req.method === "GET" && path === "/api/extras") return send(res, 200, await extrasDeHoy());
+      // Generar (con el pedido de quien conduce) o pegar (galletitas escritas en otra IA).
+      // El horóscopo se busca al mismo tiempo; si falla, las galletitas igual quedan.
+      if (req.method === "POST" && (path === "/api/extras" || path === "/api/extras/pegar")) {
+        const generar = path === "/api/extras";
+        const body = await readBody(req);
+        const texto = String((generar ? body.tema : body.texto) ?? "").trim();
+        if (!texto) return send(res, 400, { error: generar ? "Escribe el pedido de las galletitas." : "Pega las galletitas primero." });
+        if (texto.length > PEDIDO_MAX) return send(res, 400, { error: `El texto es demasiado largo (máx. ${PEDIDO_MAX} caracteres).` });
+        const [galletitas, errorHoroscopo] = await Promise.all([galletitasDe(texto, { generar }), actualizarHoroscopo()]);
+        await crearExtras(hoyChile(), { tema: generar ? texto : "", origen: generar ? "generadas" : "pegadas", galletitas });
+        return send(res, 200, await extrasDeHoy(errorHoroscopo));
+      }
+      if (req.method === "POST" && path === "/api/extras/horoscopo") return send(res, 200, await extrasDeHoy(await actualizarHoroscopo()));
+      if (req.method === "POST" && path === "/api/extras/galletita") {
+        const { donacion, usuario } = await readBody(req);
+        return send(res, 200, await sacarGalletita(hoyChile(), { donacion, usuario }));
+      }
+      const eg = path.match(/^\/api\/extras\/galletitas\/(\d+)$/);
+      if (eg && req.method === "PATCH") return send(res, 200, await editarGalletita(hoyChile(), Number(eg[1]), await readBody(req)));
+      return send(res, 404, { error: "No encontrado" });
+    } catch (err) {
+      if (err.status) return send(res, err.status, { error: err.message });
+      console.error(err);
+      return send(res, 502, { error: err.message || "Error inesperado." });
+    }
+  }
+
   // Noticia de último minuto: /api/pautas/:id/ultimo
   const um = path.match(/^\/api\/pautas\/([^/]+)\/ultimo$/);
   if (um && req.method === "POST") {
@@ -288,5 +378,11 @@ const server = http.createServer(async (req, res) => {
 
   send(res, 404, { error: "No encontrado" });
 });
+
+// El sitio del horóscopo solo deja el más reciente: se revisa cada hora para guardarlos todos.
+if (process.env.HOROSCOPO !== "no") {
+  actualizarHoroscopo();
+  setInterval(actualizarHoroscopo, 60 * 60_000).unref();
+}
 
 server.listen(PORT, HOST, () => console.log(`Pauta editorial en http://${HOST}:${server.address().port} (modelo ${MODEL})`));

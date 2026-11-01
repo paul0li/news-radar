@@ -56,6 +56,36 @@
   .h-del { min-width: 56px; background: transparent; color: var(--muted); padding: 0 16px; font-size: 22px; line-height: 1; border-left: 1px solid var(--line); border-radius: 0 8px 8px 0; }
   .h-del:hover { color: var(--err); }
 
+  /* Pestañas de la vista inicio: pauta | galletitas y horóscopo */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: -4px 0 20px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  .tabs a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; color: var(--muted); text-decoration: none; font-weight: 600; white-space: nowrap; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+  .tabs a:hover { color: var(--ink); }
+  .tabs a[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+
+  /* Galletitas y horóscopo del día (pestaña) */
+  #extras h2 { font: 700 17px Georgia, serif; margin: 0; }
+  .x-fecha { color: var(--muted); font-size: 13px; }
+  .x-elegir { display: flex; gap: 10px; flex-wrap: wrap; }
+  .x-form textarea { display: block; width: 100%; min-height: 140px; font: inherit; margin: 6px 0 10px; }
+  .x-tema { margin: 14px 0 6px; font-size: 13px; color: var(--muted); }
+  .x-tema b { color: var(--ink); white-space: pre-line; }
+  .x-list { margin: 0; padding: 0; list-style: none; counter-reset: g; display: grid; gap: 6px; }
+  .x-list li { counter-increment: g; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: start; gap: 2px 8px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .x-list li::before { content: counter(g); color: var(--muted); font: 700 13px system-ui, sans-serif; padding-top: 1px; }
+  .x-list li.usada { opacity: .55; }
+  .x-uso { grid-column: 2; color: var(--muted); font-size: 12px; }
+  .x-list .edit { grid-column: 3; grid-row: 1 / span 2; margin: -8px -6px -8px 0; }
+  .x-list .x-edit { padding: 6px 8px; }
+  .x-horo { margin-top: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .x-horo summary { cursor: pointer; font-weight: 600; min-height: 28px; }
+  .x-horo a { color: var(--accent); }
+  .x-horo dl { margin: 10px 0 0; }
+  .x-horo dt { font-weight: 700; margin-top: 10px; }
+  .x-horo dt span { color: var(--muted); font-weight: 400; font-size: 12px; }
+  .x-horo dd { margin: 2px 0 0; font-size: 14px; }
+  .x-aviso { color: var(--fun); font-size: 13px; margin: 6px 0 0; }
+  .x-horo .row { margin-top: 8px; }
+
   /* Etiqueta de tono (lista y animación) */
   .tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 99px; white-space: nowrap; background: var(--neutral-bg); color: var(--neutral); transition: background-color .4s, color .4s; }
   .gracioso .tag { background: var(--fun-bg); color: var(--fun); }
@@ -156,32 +186,60 @@
   <!-- Vista inicio: #/ -->
   <section id="viewInicio">
     <h1>📡 Pauta editorial</h1>
+    <nav class="tabs" role="tablist">
+      <a href="#/" id="tabPauta" role="tab" aria-selected="true">📡 Pauta</a>
+      <a href="#/galletitas" id="tabGalletitas" role="tab" aria-selected="false">🥠 Galletitas y horóscopo</a>
+    </nav>
 
-    <div id="form">
-      <label for="texto">Links de hoy (título + link, en cualquier formato)</label>
-      <textarea id="texto" placeholder="Perro se roba un pollo en pleno noticiero&#10;https://www.tiktok.com/@...&#10;&#10;Banco Central sube la tasa de interés https://www.latercera.com/..."></textarea>
+    <div id="panePauta">
+      <div id="form">
+        <label for="texto">Links de hoy (título + link, en cualquier formato)</label>
+        <textarea id="texto" placeholder="Perro se roba un pollo en pleno noticiero&#10;https://www.tiktok.com/@...&#10;&#10;Banco Central sube la tasa de interés https://www.latercera.com/..."></textarea>
 
-      <label for="criterio">Indicación extra (opcional)</label>
-      <input id="criterio" maxlength="500" placeholder="Ej: abrir con lo del Congreso; dejar el video del gato para el cierre">
+        <label for="criterio">Indicación extra (opcional)</label>
+        <input id="criterio" maxlength="500" placeholder="Ej: abrir con lo del Congreso; dejar el video del gato para el cierre">
 
-      <div class="row">
-        <button id="go">Armar pauta</button>
-        <span id="status" class="status" role="status"></span>
+        <div class="row">
+          <button id="go">Armar pauta</button>
+          <span id="status" class="status" role="status"></span>
+        </div>
+
+        <section id="history">
+          <div class="h-head"><h2>Historial</h2><a class="obs-link" href="ticker" target="_blank" rel="noopener" title="Abre el banner de titulares; copia su dirección en una Fuente de navegador de OBS">Banner para OBS ↗</a></div>
+          <p id="historyEmpty" hidden>Todavía no hay pautas.</p>
+          <div id="historyList"></div>
+        </section>
       </div>
 
-      <section id="history">
-        <div class="h-head"><h2>Historial</h2><a class="obs-link" href="ticker" target="_blank" rel="noopener" title="Abre el banner de titulares; copia su dirección en una Fuente de navegador de OBS">Banner para OBS ↗</a></div>
-        <p id="historyEmpty" hidden>Todavía no hay pautas.</p>
-        <div id="historyList"></div>
+      <!-- Pantalla mientras Claude ordena -->
+      <section id="armando" hidden aria-busy="true">
+        <h2>Armando la pauta…</h2>
+        <div id="shuffle" class="shuffle" aria-hidden="true"></div>
+        <p id="armandoStatus" class="status" role="status"></p>
       </section>
     </div>
 
-    <!-- Pantalla mientras Claude ordena -->
-    <section id="armando" hidden aria-busy="true">
-      <h2>Armando la pauta…</h2>
-      <div id="shuffle" class="shuffle" aria-hidden="true"></div>
-      <p id="armandoStatus" class="status" role="status"></p>
-    </section>
+    <div id="paneGalletitas" hidden>
+      <section id="extras">
+        <div class="h-head"><h2>Hoy</h2><span class="x-fecha" id="xFecha"></span></div>
+        <div class="x-elegir" id="xElegir">
+          <button type="button" id="xGenerarAbrir">🥠 Generar galletitas</button>
+          <button type="button" id="xPegarAbrir">📋 Pegar galletitas</button>
+        </div>
+        <form class="x-form" id="xForm" hidden>
+          <label for="xTexto" id="xTextoLabel"></label>
+          <textarea id="xTexto"></textarea>
+          <div class="row">
+            <button id="xGo" type="submit"></button>
+            <button id="xCancelar" type="button" class="ghost">Cancelar</button>
+          </div>
+        </form>
+        <p id="xStatus" class="status" role="status"></p>
+        <p class="x-tema" id="xTemaActual" hidden></p>
+        <ol id="xGalletitas" class="x-list"></ol>
+        <div id="xHoroscopo"></div>
+      </section>
+    </div>
   </section>
 
   <!-- Vista pauta: #/pauta/<id> -->
@@ -267,7 +325,8 @@
 
   function parseHash() {
     const m = location.hash.match(/^#\/pauta\/([^/?#]+)$/);
-    return m ? { view: "pauta", id: decodeURIComponent(m[1]) } : { view: "inicio" };
+    if (m) return { view: "pauta", id: decodeURIComponent(m[1]) };
+    return { view: "inicio", tab: location.hash === "#/galletitas" ? "galletitas" : "pauta" };
   }
 
   function showView(name) {
@@ -290,7 +349,7 @@
   async function route() {
     const r = parseHash();
     const seq = ++routeSeq;
-    if (r.view === "inicio") return showView("inicio");
+    if (r.view === "inicio") { setTab(r.tab); return showView("inicio"); }
     if (!current || current.id !== r.id) {
       try {
         const { pauta } = await api(`api/pautas/${encodeURIComponent(r.id)}`);
@@ -874,6 +933,209 @@
       status(e.message, true);
     }
   }
+
+  /* ---------- Galletitas y horóscopo del día ---------- */
+
+  let extras = null; // { fecha, tema, galletitas: [{ id, texto, usos }], horoscopo, errorHoroscopo }
+  let tab = "pauta"; // pestaña de la vista inicio
+
+  function setTab(nombre) {
+    tab = nombre;
+    $("panePauta").hidden = nombre !== "pauta";
+    $("paneGalletitas").hidden = nombre !== "galletitas";
+    $("tabPauta").setAttribute("aria-selected", nombre === "pauta");
+    $("tabGalletitas").setAttribute("aria-selected", nombre === "galletitas");
+    if (nombre === "galletitas") loadExtras();
+  }
+  let generando = false;
+
+  function xStatus(msg, err = false) {
+    $("xStatus").textContent = msg;
+    $("xStatus").classList.toggle("err", err);
+  }
+
+  // "2026-11-02" → "lunes 2 de noviembre"
+  function diaLargo(f) {
+    const [y, m, d] = f.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
+  }
+
+  function renderExtras() {
+    if (!extras) return;
+    $("xFecha").textContent = diaLargo(extras.fecha);
+    $("xTemaActual").hidden = !extras.galletitas.length;
+    $("xTemaActual").innerHTML = extras.origen === "pegadas" ? "Galletitas pegadas." : "Pedido: <b></b>";
+    if (extras.origen !== "pegadas") $("xTemaActual").querySelector("b").textContent = extras.tema;
+
+    const lista = $("xGalletitas");
+    lista.replaceChildren(...extras.galletitas.map((g) => {
+      const li = document.createElement("li");
+      li.classList.toggle("usada", g.usos.length > 0);
+      const texto = Object.assign(document.createElement("span"), { className: "x-texto", textContent: g.texto });
+      const lapiz = Object.assign(document.createElement("button"), { type: "button", className: "edit", textContent: "✎", title: "Editar galletita" });
+      lapiz.setAttribute("aria-label", "Editar galletita");
+      lapiz.addEventListener("click", () => editarGalletita(g, texto));
+      li.append(texto, lapiz);
+      if (g.usos.length) {
+        const uso = document.createElement("span");
+        uso.className = "x-uso";
+        uso.textContent = "✓ " + g.usos.map((u) => u.usuario || "alguien").join(", ");
+        li.append(uso);
+      }
+      return li;
+    }));
+
+    const box = $("xHoroscopo");
+    box.replaceChildren();
+    const h = extras.horoscopo;
+    if (!h && !extras.galletitas.length && !extras.errorHoroscopo) return;
+    const wrap = document.createElement(h ? "details" : "div");
+    wrap.className = "x-horo";
+    if (h) {
+      wrap.innerHTML = `<summary></summary><p class="status">Fuente: <a target="_blank" rel="noopener"></a></p><dl></dl>`;
+      wrap.querySelector("summary").textContent = `♈ Horóscopo de ${h.fuente} · ${diaLargo(h.fecha)}`;
+      const a = wrap.querySelector("a");
+      a.href = h.url;
+      a.textContent = h.fuente;
+      if (h.fecha !== extras.fecha) {
+        box.append(Object.assign(document.createElement("p"), { className: "x-aviso", textContent: `Ojo: el horóscopo es del ${diaLargo(h.fecha)}; el de hoy no apareció.` }));
+      }
+      for (const s of h.signos) {
+        const dt = document.createElement("dt");
+        dt.textContent = `${s.nombre} `;
+        dt.append(Object.assign(document.createElement("span"), { textContent: `(${s.fechas})` }));
+        wrap.querySelector("dl").append(dt, Object.assign(document.createElement("dd"), { textContent: s.texto }));
+      }
+    } else {
+      wrap.innerHTML = `<b>♈ Todavía no hay horóscopo de hoy.</b><p class="status"></p><div class="row"><button class="ghost" type="button">Buscar de nuevo</button></div>`;
+      wrap.querySelector(".status").textContent = extras.errorHoroscopo || "Yolanda Sultana lo publica en primedigital.cl; el servidor lo revisa cada hora.";
+      wrap.querySelector("button").addEventListener("click", buscarHoroscopo);
+    }
+    box.append(wrap);
+  }
+
+  // Edita una galletita en su lugar: Enter o salir del campo guarda, Esc cancela.
+  function editarGalletita(g, span) {
+    if (span.hidden) return;
+    const input = Object.assign(document.createElement("input"), { className: "x-edit", maxLength: 300, value: g.texto });
+    input.setAttribute("aria-label", "Galletita");
+    span.hidden = true;
+    span.after(input);
+    input.focus();
+    let cerrada = false;
+    const cerrar = async (guardar) => {
+      if (cerrada) return;
+      cerrada = true;
+      const texto = input.value.replace(/\s+/g, " ").trim();
+      if (!guardar || !texto || texto === g.texto) {
+        input.remove();
+        span.hidden = false;
+        if (guardar && !texto) xStatus("Una galletita no puede quedar vacía.", true);
+        return;
+      }
+      input.disabled = true;
+      try {
+        const { galleta } = await api(`api/extras/galletitas/${g.id}`, { method: "PATCH", body: JSON.stringify({ texto }) });
+        g.texto = galleta.texto;
+        xStatus("Galletita editada.");
+      } catch (e) {
+        xStatus(e.message, true);
+      }
+      renderExtras();
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); cerrar(true); }
+      else if (e.key === "Escape") { e.preventDefault(); cerrar(false); }
+    });
+    input.addEventListener("blur", () => cerrar(true));
+  }
+
+  async function loadExtras() {
+    if (document.querySelector(".x-edit")) return; // no pisar una galletita a medio editar
+    try {
+      extras = await api("api/extras");
+      renderExtras();
+    } catch (e) {
+      console.warn("No pude cargar las galletitas:", e);
+    }
+  }
+
+  async function buscarHoroscopo(e) {
+    e.target.disabled = true;
+    try {
+      extras = await api("api/extras/horoscopo", { method: "POST", body: "{}" });
+      renderExtras();
+    } catch (err) {
+      xStatus(err.message, true);
+    } finally {
+      e.target.disabled = false;
+    }
+  }
+
+  // Primero se elige: generar (Claude redacta lo que Su pide, tal cual) o pegar (Claude solo las separa).
+  const MODOS = {
+    generar: {
+      label: "Escribe tu pedido a Claude, tal como lo quieras",
+      placeholder: "Ej: En Chile hay tormentas, inundaciones y eventuales tornados. Hágame 15 frases tipo galleta de la suerte para animar a los auditores.",
+      max: 4000, boton: "Generar", ruta: "api/extras", campo: "tema",
+      vacio: "Escribe el pedido de las galletitas.",
+      espera: "Escribiendo galletitas y trayendo el horóscopo…",
+    },
+    pegar: {
+      label: "Pega las galletitas tal cual (de otra IA, numeradas, con viñetas o una por línea)",
+      placeholder: "1. Hoy alguien te dará un consejo que nunca siguió.\n2. Si te pasan la pega, no le preguntes al que salió.\n…",
+      max: 50000, boton: "Usar estas galletitas", ruta: "api/extras/pegar", campo: "texto",
+      vacio: "Pega las galletitas primero.",
+      espera: "Separando las galletitas y trayendo el horóscopo…",
+    },
+  };
+  let modo = null;
+  function abrirForm(m) {
+    modo = m;
+    $("xElegir").hidden = !!m;
+    $("xForm").hidden = !m;
+    if (!m) return;
+    const c = MODOS[m];
+    $("xTextoLabel").textContent = c.label;
+    Object.assign($("xTexto"), { placeholder: c.placeholder, maxLength: c.max, value: "" });
+    $("xGo").textContent = c.boton;
+    $("xTexto").focus();
+  }
+  $("xGenerarAbrir").addEventListener("click", () => abrirForm("generar"));
+  $("xPegarAbrir").addEventListener("click", () => abrirForm("pegar"));
+  $("xCancelar").addEventListener("click", () => abrirForm(null));
+  $("xTexto").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $("xForm").requestSubmit(); } });
+  $("xForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (generando) return;
+    const c = MODOS[modo];
+    const texto = $("xTexto").value.trim();
+    if (!texto) return xStatus(c.vacio, true);
+    const usadas = extras ? extras.galletitas.filter((g) => g.usos.length).length : 0;
+    if (usadas && !confirm(`Ya se entregaron ${usadas} galletitas hoy. ¿Reemplazarlas por las nuevas?`)) return;
+    generando = true;
+    $("xGo").disabled = true;
+    const t0 = Date.now();
+    const tick = () => xStatus(`${c.espera} ${Math.round((Date.now() - t0) / 1000)} s`);
+    tick();
+    const timer = setInterval(tick, 1000);
+    try {
+      extras = await api(c.ruta, { method: "POST", body: JSON.stringify({ [c.campo]: texto }) });
+      renderExtras();
+      abrirForm(null);
+      xStatus(`Listas: ${extras.galletitas.length} galletitas en ${Math.round((Date.now() - t0) / 1000)} s. Revísalas abajo y edítalas con ✎ si hace falta.`
+        + (extras.horoscopo ? "" : " El horóscopo no se pudo traer."), !extras.horoscopo);
+    } catch (err) {
+      xStatus(err.message, true);
+    } finally {
+      clearInterval(timer);
+      generando = false;
+      $("xGo").disabled = false;
+    }
+  });
+
+  // Mientras se ve la pestaña, refleja las galletitas que va entregando el panel de donaciones.
+  setInterval(() => { if (view === "inicio" && tab === "galletitas" && !generando && !document.hidden) loadExtras(); }, 20_000);
 
   /* ---------- Animación "armando": una lista que se reordena ---------- */
 
