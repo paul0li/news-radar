@@ -32,7 +32,7 @@
 <style>
   :root { --tam: 40px; --alto: 72px; --fondo: #0b0b0dd9; --color: #fff; --acento: #c2410c; --fuente: "Anton", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
-  .bar { position: fixed; left: 0; right: 0; bottom: 0; height: var(--alto); display: flex; align-items: stretch; background: var(--fondo); color: var(--color); font: 700 var(--tam)/1 var(--fuente); font-synthesis: none; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; height: var(--alto); display: flex; align-items: stretch; background: var(--fondo); color: var(--color); font: 700 calc(var(--tam) * .9)/1 var(--fuente); font-synthesis: none; }
   .bar.arriba { top: 0; bottom: auto; }
   .bar.vacia { visibility: hidden; }
   .bar.sin { display: none; }
@@ -102,7 +102,7 @@
     position: relative; flex: 1; min-width: 0; overflow: hidden;
     padding: calc(var(--T) * .16) calc(var(--T) * .5 + var(--s)) calc(var(--T) * .16) calc(var(--T) * .4);
     background: linear-gradient(90deg, var(--texto)); color: var(--texto-color);
-    font: 400 var(--T)/1.12 "Anton", var(--fuente); letter-spacing: .01em;
+    font: 400 calc(var(--T) * .9)/1.12 "Anton", var(--fuente); letter-spacing: .01em;
   }
   /* Paletas sacadas de las referencias: "tv" (sello azul, barra rosa, franja amarilla) y "24" (sello
      amarillo, barra rosa, franja azul), cada una con una variante. */
