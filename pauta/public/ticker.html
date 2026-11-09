@@ -6,7 +6,7 @@
 <title>Titulares</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:ital,wght@0,800;1,800;1,900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Semi+Condensed:ital,wght@0,800;1,800;1,900&display=swap" rel="stylesheet">
 <!--
   Banner de titulares para OBS (Fuente de navegador). Muestra en loop los titulares de la pauta más
   reciente y se actualiza solo. Parámetros opcionales en la URL:
@@ -16,7 +16,7 @@
     color      color del texto (#ffffff)       acento    color de la etiqueta (#c2410c)
     etiqueta   texto de la etiqueta (TITULARES); vacío para ocultarla
     posicion   abajo | arriba (abajo)
-    fuente     familia tipográfica (system-ui)
+    fuente     familia tipográfica de la franja (Anton)
     aviso      texto destacado que aparece entre los titulares (p. ej. una campaña)
     cada       cada cuántos titulares aparece el aviso (5)
     actual     si | no (si): muestra en grande, sobre la franja, la última noticia abierta en la pauta
@@ -30,9 +30,9 @@
   Ej: /ticker?tam=48&velocidad=120&etiqueta=HOY
 -->
 <style>
-  :root { --tam: 40px; --alto: 72px; --fondo: #0b0b0dd9; --color: #fff; --acento: #c2410c; --fuente: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  :root { --tam: 40px; --alto: 72px; --fondo: #0b0b0dd9; --color: #fff; --acento: #c2410c; --fuente: "Anton", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
-  .bar { position: fixed; left: 0; right: 0; bottom: 0; height: var(--alto); display: flex; align-items: stretch; background: var(--fondo); color: var(--color); font: 700 var(--tam)/1 var(--fuente); }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; height: var(--alto); display: flex; align-items: stretch; background: var(--fondo); color: var(--color); font: 700 var(--tam)/1 var(--fuente); font-synthesis: none; }
   .bar.arriba { top: 0; bottom: auto; }
   .bar.vacia { visibility: hidden; }
   .bar.sin { display: none; }
@@ -63,7 +63,7 @@
     --eco: #7fd8ff, #ffe48a;
     position: fixed; left: calc(var(--T) * .6); right: calc(var(--T) * .6); bottom: calc(var(--alto) + var(--T) * .45);
     display: flex; align-items: stretch;
-    font-family: "Barlow Semi Condensed", var(--fuente);
+    font-family: "Anton", var(--fuente);
     filter: drop-shadow(0 calc(var(--T) * .1) calc(var(--T) * .22) rgba(0, 0, 0, .4));
   }
   .now.arriba { top: calc(var(--alto) + var(--T) * .45); bottom: auto; }
@@ -71,7 +71,7 @@
     position: relative; z-index: 2; flex: none; display: flex; flex-direction: column; justify-content: center;
     margin-right: calc(var(--s) * -1); padding: 0 calc(var(--T) * .5) 0 calc(var(--T) * .55);
     background: linear-gradient(135deg, var(--sello)); color: var(--sello-color);
-    font: italic 900 calc(var(--T) * .66)/.92 "Barlow Semi Condensed", var(--fuente); text-transform: uppercase;
+    font: italic 400 calc(var(--T) * .62)/1 "Anton", var(--fuente); text-transform: uppercase;
     clip-path: polygon(var(--s) 0, 100% 0, calc(100% - var(--s)) 100%, 0 100%);
     transform-origin: 30% 50%; transition: transform .3s ease, opacity .3s ease;
   }
@@ -87,14 +87,14 @@
   .cabeza {
     padding: calc(var(--T) * .1) calc(var(--T) * 1.1) calc(var(--T) * .1) calc(var(--s) + var(--T) * .35);
     background: linear-gradient(90deg, var(--cabeza)); color: var(--cabeza-color);
-    font: italic 800 calc(var(--T) * .5)/1.1 "Barlow Semi Condensed", var(--fuente); letter-spacing: .05em; text-transform: uppercase;
+    font: italic 400 calc(var(--T) * .46)/1.15 "Anton", var(--fuente); letter-spacing: .06em; text-transform: uppercase;
     clip-path: var(--abierto); transition: clip-path .3s ease;
   }
   .cabeza[hidden] { display: none; }
   .pie { width: 100%; display: flex; align-items: stretch; clip-path: var(--abierto); transition: clip-path .3s ease; }
   .hora {
     flex: none; display: flex; align-items: center; padding: 0 calc(var(--T) * .35) 0 calc(var(--s) + var(--T) * .3);
-    background: var(--hora-fondo); color: var(--hora-color); font: italic 800 calc(var(--T) * .55)/1 "Barlow Semi Condensed", var(--fuente);
+    background: var(--hora-fondo); color: var(--hora-color); font: italic 400 calc(var(--T) * .52)/1 "Anton", var(--fuente);
     font-variant-numeric: tabular-nums;
   }
   .hora[hidden] { display: none; }
@@ -102,7 +102,7 @@
     position: relative; flex: 1; min-width: 0; overflow: hidden;
     padding: calc(var(--T) * .16) calc(var(--T) * .5 + var(--s)) calc(var(--T) * .16) calc(var(--T) * .4);
     background: linear-gradient(90deg, var(--texto)); color: var(--texto-color);
-    font: 800 var(--T)/1.08 "Barlow Semi Condensed", var(--fuente);
+    font: 400 var(--T)/1.12 "Anton", var(--fuente); letter-spacing: .01em;
   }
   /* Paletas sacadas de las referencias: "tv" (sello azul, barra rosa, franja amarilla) y "24" (sello
      amarillo, barra rosa, franja azul), cada una con una variante. */
