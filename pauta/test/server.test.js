@@ -18,7 +18,7 @@ before(async () => {
   await new Promise((r) => sitio.once("listening", r));
   server = spawn(process.execPath, ["server.js"], {
     cwd: fileURLToPath(new URL("..", import.meta.url)),
-    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", DATA_DIR: dir, APP_PASSWORD: "", CLAUDE_BIN: "./test/fake-claude.js", FAKE_DELAY_MS: "0", HOROSCOPO_URL: `http://127.0.0.1:${sitio.address().port}/` },
+    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", DATA_DIR: dir, APP_PASSWORD: "", OPENAI_API_KEY: "", CLAUDE_BIN: "./test/fake-claude.js", FAKE_DELAY_MS: "0", HOROSCOPO_URL: `http://127.0.0.1:${sitio.address().port}/` },
     stdio: ["ignore", "pipe", "inherit"],
   });
   base = await new Promise((resolve, reject) => {

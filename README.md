@@ -5,7 +5,7 @@ relevant stories, and label them as checked, unchecked or likely fake.
 
 ## Modules
 
-- [`pauta/`](pauta/) **Pauta editorial**: paste the day's links and Claude orders them for a live
+- [`pauta/`](pauta/) **Pauta editorial**: paste the day's links and an AI (OpenAI or Claude) orders them for a live
   stream, alternating funny and serious stories to keep the audience watching.
 - Repository root and `pendiente/`: scraping experiments against Chilean news outlets
   (`.http` requests and `test_biobio.py`).
