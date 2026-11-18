@@ -1,15 +1,16 @@
 # 📡 Pauta editorial
 
 A tiny web app for live-stream hosts who comment on links. Paste the day's list (~40 links from news
-sites, social media, videos; title + URL in almost any format) and Claude returns a running order that
+sites, social media, videos; title + URL in almost any format) and an AI returns a running order that
 **alternates funny and serious stories** so viewers don't drop off. Every link opens in a new tab.
 
 - One HTML file with no libraries, plus a Node server with **zero dependencies**.
-- Calls **Claude Code** in headless mode (`claude -p`), so it runs on your Claude subscription with no
-  API key. It is meant for personal use.
-- Headlines keep the editor's own words: Claude only fixes spelling, accents, capitalization and
+- Uses the **OpenAI API** when `OPENAI_API_KEY` is set (Responses API with strict structured output,
+  default model `gpt-6.1-terra`). Without it, it calls **Claude Code** in headless mode (`claude -p`),
+  so it runs on your Claude subscription with no API key. It is meant for personal use.
+- Headlines keep the editor's own words: the AI only fixes spelling, accents, capitalization and
   punctuation (it never adds, removes or reorders words).
-- Claude only returns **ids**, a tone and a one-line reason. URLs always come from your original list,
+- The AI only returns **ids**, a tone and a one-line reason. URLs always come from your original list,
   so they can never be invented or altered. Missing or duplicated ids are fixed server-side
   (anything missing goes at the end).
 
@@ -17,7 +18,8 @@ sites, social media, videos; title + URL in almost any format) and Claude return
 
 ## Run locally
 
-Requires Node ≥ 20 and [Claude Code](https://code.claude.com) installed and logged in.
+Requires Node ≥ 20 and either `OPENAI_API_KEY` in `.env` or [Claude Code](https://code.claude.com)
+installed and logged in.
 
 ```bash
 npm run dev            # http://localhost:3000
@@ -25,7 +27,8 @@ npm run dev            # http://localhost:3000
 
 ## Deploy
 
-On any Linux server with Node ≥ 20 and Claude Code installed:
+With OpenAI, set `OPENAI_API_KEY` in the environment (e.g. the systemd `EnvironmentFile`) and skip the
+Claude Code steps below. Otherwise, on any Linux server with Node ≥ 20 and Claude Code installed:
 
 ```bash
 claude setup-token     # creates a long-lived token for your subscription
@@ -66,7 +69,7 @@ so it needs no password:
    script and in the unit file to match your server.
 
 To expose it publicly instead, put a reverse proxy with HTTPS (nginx, Caddy) in front and set
-`APP_PASSWORD`, since every request spends your Claude usage.
+`APP_PASSWORD`, since every request spends your AI usage.
 
 ## OBS headline ticker
 
@@ -111,11 +114,11 @@ Example: `/ticker?tam=48&velocidad=120&etiqueta=Hoy`. The data comes from `GET /
 The **🥠 Galletitas y horóscopo** tab is for viewers who ask for a fortune cookie or their horoscope
 with a donation. It offers two buttons:
 
-- **Generar galletitas**: the host writes the whole request to Claude, as they want it (up to 4000
+- **Generar galletitas**: the host writes the whole request to the AI, as they want it (up to 4000
   characters, e.g. "En Chile hay tormentas, inundaciones y eventuales tornados. Hágame 15 frases tipo
-  galleta de la suerte para animar a los auditores"). There are no built-in cookie rules: Claude just
-  writes what is asked, and may look things up on the web (Claude Code's own WebSearch, no extra API key).
-- **Pegar galletitas**: paste cookies written elsewhere (e.g. another AI's answer, as is). Claude only
+  galleta de la suerte para animar a los auditores"). There are no built-in cookie rules: the AI just
+  writes what is asked, and may look things up on the web (OpenAI's `web_search` tool, or Claude Code's WebSearch).
+- **Pegar galletitas**: paste cookies written elsewhere (e.g. another AI's answer, as is). The AI only
   splits them into separate cookies, word for word, dropping numbering, formatting, intros and closing lines.
 
 Either way they become today's cookies (1 to 50), and at the same time the server fetches the day's
@@ -132,10 +135,13 @@ within 3 days is used and the page says which day it is.
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `OPENAI_API_KEY` | — | When set, the app uses the OpenAI API instead of Claude Code. |
+| `OPENAI_MODEL` | `gpt-6.1-terra` | OpenAI model id. |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Only for tests or an OpenAI-compatible proxy. |
 | `CLAUDE_CODE_OAUTH_TOKEN` | — | Token from `claude setup-token`. Not needed if the machine already has a Claude Code login. |
 | `APP_PASSWORD` | empty | When set, the browser asks for a password (Basic Auth, any username). Recommended for public deployments. |
-| `MODEL` | `opus` | Passed to `claude --model` (`opus`, `sonnet`, `haiku` or a full model id). |
-| `EFFORT` | `low` | `low` / `medium` / `high`. Ordering ~40 titles doesn't need more than `low`. |
+| `MODEL` | `opus` | Claude only: passed to `claude --model` (`opus`, `sonnet`, `haiku` or a full model id). |
+| `EFFORT` | `low` | Reasoning effort for either provider: `low` / `medium` / `high`. Ordering ~40 titles doesn't need more than `low`. |
 | `CLAUDE_BIN` | `claude` | Path to the Claude Code binary if it isn't on `PATH`. |
 | `HOST` | `0.0.0.0` | Interface to listen on. Use `127.0.0.1` behind a proxy or `tailscale serve`. |
 | `PORT` | `3000` | |
@@ -151,16 +157,16 @@ All endpoints use the same auth as the page.
 
 | Method & path | Body | Response |
 |---|---|---|
-| `POST /api/ordenar` | `{ texto, criterio? }` | `{ pauta, model }` (calls Claude and saves the result) |
+| `POST /api/ordenar` | `{ texto, criterio? }` | `{ pauta, model }` (calls the AI and saves the result) |
 | `GET /api/pautas` | | `{ pautas: [{ id, createdAt, updatedAt, count, doneCount, preview }] }`, newest first (max 30) |
 | `GET /api/pautas/:id` | | `{ pauta }` |
 | `PUT /api/pautas/:id` | `{ order?, done?, actual? }` | `{ pauta }`. `order` must be a permutation of all item ids; `done` is the full list of opened item ids; `actual` is the id of the story being discussed (or `null`). |
 | `DELETE /api/pautas/:id` | | `{ ok: true }` |
 | `GET /api/extras` | | Today's (Chile) `{ fecha, tema, origen, createdAt, galletitas: [{ id, texto, usos: [{ donacion, usuario, at }] }], horoscopo, errorHoroscopo }`. `horoscopo` is `{ fuente, url, fecha, titulo, signos: [{ signo, nombre, fechas, texto }] }` or `null`. |
-| `POST /api/extras` | `{ tema }` | Same as `GET`. Claude writes fortune cookies following `tema` (the host's request, as is), replacing today's, and the horoscope is refreshed. `origen` is `"generadas"`. |
+| `POST /api/extras` | `{ tema }` | Same as `GET`. The AI writes fortune cookies following `tema` (the host's request, as is), replacing today's, and the horoscope is refreshed. `origen` is `"generadas"`. |
 | `POST /api/extras/horoscopo` | | Same as `GET`, after looking for a newer horoscope. |
 | `PATCH /api/extras/galletitas/:id` | `{ texto }` | `{ galleta }`. Edits one of today's cookies (also for donations that already got it). |
-| `POST /api/extras/pegar` | `{ texto }` | Same as `GET`. Claude splits pasted cookies (1–50) word for word and makes them today's; `origen` is `"pegadas"`. |
+| `POST /api/extras/pegar` | `{ texto }` | Same as `GET`. The AI splits pasted cookies (1–50) word for word and makes them today's; `origen` is `"pegadas"`. |
 | `POST /api/extras/galletita` | `{ donacion, usuario? }` | `{ galleta, nueva, sinUsar }`. The same donation always gets the same cookie; `409` if there are none today. |
 | `PATCH /api/pautas/:id/items/:itemId` | `{ titulo }` | `{ pauta, item }`. Edits the headline shown on screen; an empty `titulo` restores the original title. |
 
@@ -171,7 +177,7 @@ the order of `items` is the running order. Invalid input returns `400`, unknown 
 
 The rules (open with a hook, never more than two serious stories in a row, no jokes right next to a
 tragedy, headlines only spell-checked, and so on) live in the `SYSTEM` prompt in [`server.js`](server.js).
-Fortune cookies have no rules of their own: the host's request goes to Claude as is. The UI also has an
+Fortune cookies have no rules of their own: the host's request goes to the AI as is. The UI also has an
 optional "extra instruction" field for the day.
 
 ## Tests
@@ -180,7 +186,7 @@ optional "extra instruction" field for the day.
 npm test
 ```
 
-To try the whole app without spending Claude usage, point `CLAUDE_BIN` at the bundled fake, which
+To try the whole app without spending AI usage, leave `OPENAI_API_KEY` empty and point `CLAUDE_BIN` at the bundled fake, which
 shuffles the links and assigns random tones (`FAKE_DELAY_MS` sets its response delay, default 1500):
 
 ```bash

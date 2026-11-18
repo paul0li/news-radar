@@ -14,7 +14,11 @@ import { ultimoHoroscopo } from "./horoscopo.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
-const MODEL = process.env.MODEL || "opus";
+// Con OPENAI_API_KEY la pauta usa la API de OpenAI; si no, Claude Code (`claude -p`).
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
+const PROVEEDOR = OPENAI_API_KEY ? "openai" : "claude";
+const MODEL = PROVEEDOR === "openai" ? process.env.OPENAI_MODEL || "gpt-6.1-terra" : process.env.MODEL || "opus";
 const EFFORT = process.env.EFFORT || "low";
 // Rutas relativas (ej. ./test/fake-claude.js) se resuelven desde donde se lanzó el server,
 // porque claude corre con cwd temporal.
@@ -82,6 +86,48 @@ const SCHEMA_GALLETITAS = {
   additionalProperties: false,
 };
 
+// Llama a la IA configurada: OpenAI (Responses API) si hay OPENAI_API_KEY, si no Claude Code.
+function runIA(prompt, opciones) {
+  return PROVEEDOR === "openai" ? runOpenAI(prompt, opciones) : runClaude(prompt, opciones);
+}
+
+// OpenAI Responses API con salida estructurada (json_schema estricto). `buscar` habilita web_search.
+async function runOpenAI(prompt, { schema = SCHEMA, system = SYSTEM, buscar = false } = {}) {
+  let r;
+  try {
+    r = await fetch(`${OPENAI_BASE_URL}/responses`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: MODEL,
+        instructions: system,
+        input: prompt,
+        reasoning: { effort: EFFORT },
+        ...(buscar ? { tools: [{ type: "web_search" }] } : {}),
+        text: { format: { type: "json_schema", name: "respuesta", schema, strict: true } },
+        store: false,
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw new Error(err.name === "TimeoutError" ? "OpenAI tardó demasiado en responder." : `No pude conectar con OpenAI: ${err.message}`);
+  }
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`OpenAI: ${data.error?.message || `error ${r.status}`}`.slice(0, 500));
+  const partes = (data.output || []).filter((o) => o.type === "message").flatMap((o) => o.content || []);
+  const negativa = partes.find((c) => c.type === "refusal");
+  if (negativa) throw new Error(`OpenAI no quiso responder: ${negativa.refusal}`.slice(0, 500));
+  if (data.status && data.status !== "completed") {
+    throw new Error(`OpenAI no terminó la respuesta (${data.incomplete_details?.reason || data.status}).`);
+  }
+  const texto = partes.filter((c) => c.type === "output_text").map((c) => c.text).join("");
+  try {
+    return JSON.parse(texto);
+  } catch {
+    throw new Error("OpenAI devolvió una respuesta que no es JSON.");
+  }
+}
+
 // Llama a Claude Code en modo headless (`claude -p`), usando la sesión/suscripción de la máquina.
 // `buscar` le deja a Claude la búsqueda web (WebSearch) por si el pedido la necesita; si no, corre sin herramientas.
 function runClaude(prompt, { schema = SCHEMA, system = SYSTEM, buscar = false } = {}) {
@@ -129,7 +175,7 @@ function runClaude(prompt, { schema = SCHEMA, system = SYSTEM, buscar = false } 
 async function ordenar(items, criterio) {
   const lista = items.map((it) => `${it.id}. ${it.title} (${it.domain})`).join("\n");
   const extra = criterio ? `\n\nIndicación extra del editor para hoy: ${criterio}` : "";
-  const { orden } = await runClaude(`Links de hoy (id. título (dominio)):\n${lista}${extra}`);
+  const { orden } = await runIA(`Links de hoy (id. título (dominio)):\n${lista}${extra}`);
   return orden;
 }
 
@@ -137,23 +183,23 @@ async function ordenar(items, criterio) {
 // El id 0 es provisorio; el store le asigna el definitivo al guardarla.
 async function redactarUltimoMinuto(titular, url) {
   const item = { id: 0, title: titular, url, domain: url ? domainOf(url) : "" };
-  const { orden } = await runClaude(
+  const { orden } = await runIA(
     `Noticia de último minuto para sumar a una pauta ya armada. Va primera: solo corrige la ortografía de su título y clasifica su tono.\n` +
       `${item.id}. ${item.title} (${item.domain || "sin link"})`,
   );
   return reconciliar([item], orden)[0];
 }
 
-// Galletitas del día: `generar` le pasa el pedido de quien conduce tal cual; si no, Claude solo
+// Galletitas del día: `generar` le pasa el pedido de quien conduce tal cual; si no, la IA solo
 // separa en frases un texto pegado (escrito en otra IA), sin cambiarlas.
 async function galletitasDe(texto, { generar }) {
-  const { galletitas } = await runClaude(texto, {
+  const { galletitas } = await runIA(texto, {
     schema: SCHEMA_GALLETITAS,
     system: generar ? SYSTEM_GENERAR : SYSTEM_SEPARAR,
     buscar: generar,
   });
   const limpias = [...new Set((galletitas || []).map((g) => String(g).replace(/\s+/g, " ").trim()).filter(Boolean))];
-  if (!limpias.length) throw Object.assign(new Error(generar ? "Claude no devolvió galletitas. Prueba de nuevo." : "No encontré galletitas en el texto pegado."), { status: 400 });
+  if (!limpias.length) throw Object.assign(new Error(generar ? "La IA no devolvió galletitas. Prueba de nuevo." : "No encontré galletitas en el texto pegado."), { status: 400 });
   if (limpias.length > GALLETITAS_MAX) throw Object.assign(new Error(`Son ${limpias.length} galletitas: el máximo es ${GALLETITAS_MAX}.`), { status: 400 });
   return limpias.map((g) => g.slice(0, 300));
 }
@@ -385,4 +431,4 @@ if (process.env.HOROSCOPO !== "no") {
   setInterval(actualizarHoroscopo, 60 * 60_000).unref();
 }
 
-server.listen(PORT, HOST, () => console.log(`Pauta editorial en http://${HOST}:${server.address().port} (modelo ${MODEL})`));
+server.listen(PORT, HOST, () => console.log(`Pauta editorial en http://${HOST}:${server.address().port} (${PROVEEDOR}, modelo ${MODEL})`));

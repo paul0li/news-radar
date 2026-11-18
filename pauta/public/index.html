@@ -211,7 +211,7 @@
         </section>
       </div>
 
-      <!-- Pantalla mientras Claude ordena -->
+      <!-- Pantalla mientras la IA ordena -->
       <section id="armando" hidden aria-busy="true">
         <h2>Armando la pauta…</h2>
         <div id="shuffle" class="shuffle" aria-hidden="true"></div>
@@ -1072,10 +1072,10 @@
     }
   }
 
-  // Primero se elige: generar (Claude redacta lo que Su pide, tal cual) o pegar (Claude solo las separa).
+  // Primero se elige: generar (la IA redacta lo que Su pide, tal cual) o pegar (la IA solo las separa).
   const MODOS = {
     generar: {
-      label: "Escribe tu pedido a Claude, tal como lo quieras",
+      label: "Escribe tu pedido a la IA, tal como lo quieras",
       placeholder: "Ej: En Chile hay tormentas, inundaciones y eventuales tornados. Hágame 15 frases tipo galleta de la suerte para animar a los auditores.",
       max: 4000, boton: "Generar", ruta: "api/extras", campo: "tema",
       vacio: "Escribe el pedido de las galletitas.",
