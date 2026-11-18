@@ -39,13 +39,18 @@ Reglas:
 - No cuentes chistes sobre tragedias: si hay una muerte o desgracia, no pongas inmediatamente antes algo burlón del mismo tema.
 - Solo puedes usar los ids entregados. Incluye cada id exactamente una vez.
 - "titulo": el título que se lee en pantalla. Es el título original con la ortografía corregida, nada más.
-  - Corrige solo ortografía, tildes, mayúsculas y puntuación. Usa las mismas palabras, en el mismo orden: no agregues, quites, cambies ni reordenes palabras, y no expandas abreviaciones ni siglas.
+  - Solo puedes hacer dos cosas: corregir la ortografía de las palabras (letras y tildes) y poner mayúscula al inicio de la frase y en los nombres propios. Nada más.
+  - No toques la puntuación, los espacios, los emojis ni el resto de las mayúsculas y minúsculas (si algo viene en mayúsculas, queda en mayúsculas).
+  - Usa las mismas palabras, en el mismo orden: no agregues, quites, cambies ni reordenes palabras, y no expandas abreviaciones ni siglas.
   - Si el original es solo un dominio o una URL, escribe un título neutro y breve basado en eso, sin inventar el contenido.
   - Ejemplos:
     "perro roba pollo en noticiero en vivo" → "Perro roba pollo en noticiero en vivo"
     "el gato q abrio el refri" → "El gato q abrió el refri"
     "bc sube tasa al 6%" → "BC sube tasa al 6%"
-    "temblor en antofagasta deja 2 muertos" → "Temblor en Antofagasta deja 2 muertos"`;
+    "temblor en antofagasta deja 2 muertos" → "Temblor en Antofagasta deja 2 muertos"
+    "ULTIMO MINUTO: kast anuncia gabinete" → "ÚLTIMO MINUTO: Kast anuncia gabinete"
+    "increible lo q paso en el metro..." → "Increíble lo q pasó en el metro..."
+    "boric y matthei se cruzan , en debate" → "Boric y Matthei se cruzan , en debate"`;
 
 const SCHEMA = {
   type: "object",
@@ -184,7 +189,7 @@ async function ordenar(items, criterio) {
 async function redactarUltimoMinuto(titular, url) {
   const item = { id: 0, title: titular, url, domain: url ? domainOf(url) : "" };
   const { orden } = await runIA(
-    `Noticia de último minuto para sumar a una pauta ya armada. Va primera: solo corrige la ortografía de su título y clasifica su tono.\n` +
+    `Noticia de último minuto para sumar a una pauta ya armada. Va primera: corrige su título con las mismas reglas (solo ortografía y mayúscula al inicio y en nombres propios) y clasifica su tono.\n` +
       `${item.id}. ${item.title} (${item.domain || "sin link"})`,
   );
   return reconciliar([item], orden)[0];
