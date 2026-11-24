@@ -8,8 +8,10 @@ sites, social media, videos; title + URL in almost any format) and an AI returns
 - Uses the **OpenAI API** when `OPENAI_API_KEY` is set (Responses API with strict structured output,
   default model `gpt-6.1-terra`). Without it, it calls **Claude Code** in headless mode (`claude -p`),
   so it runs on your Claude subscription with no API key. It is meant for personal use.
-- Headlines keep the editor's own words: the AI only fixes spelling, accents, capitalization and
-  punctuation (it never adds, removes or reorders words).
+- Headlines keep the editor's own words: the AI only fixes spelling (wrong letters and accents).
+  Capitalization, punctuation, spacing and emojis stay exactly as written, and words are never added,
+  removed or reordered. This is enforced in code (`titulo.js`), not only asked in the prompt: the
+  AI's headline is compared word by word with yours, and anything beyond a spelling fix is undone.
 - The AI only returns **ids**, a tone and a one-line reason. URLs always come from your original list,
   so they can never be invented or altered. Missing or duplicated ids are fixed server-side
   (anything missing goes at the end).
