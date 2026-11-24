@@ -59,11 +59,11 @@ async function api(path, body) {
 }
 
 test("ordenar usa la Responses API con esquema estricto y sin búsqueda", async () => {
-  siguiente = respuesta({ orden: [{ id: 2, tono: "gracioso", titulo: "Gato abre refri" }, { id: 1, tono: "serio", titulo: "Sube la tasa" }] });
-  const { status, data } = await api("/api/ordenar", { texto: "sube la tasa https://b.cl/2\ngato abre refri https://c.cl/3" });
+  siguiente = respuesta({ orden: [{ id: 2, tono: "gracioso", titulo: "Gato abre refri" }, { id: 1, tono: "serio", titulo: "sube la tasa de interés" }] });
+  const { status, data } = await api("/api/ordenar", { texto: "sube la tasa de interes https://b.cl/2\ngato abre refri https://c.cl/3" });
   assert.equal(status, 200);
   assert.equal(data.model, "gpt-prueba");
-  assert.deepEqual(data.pauta.items.map((it) => it.titulo), ["Gato abre refri", "Sube la tasa"]);
+  assert.deepEqual(data.pauta.items.map((it) => it.titulo), ["gato abre refri", "sube la tasa de interés"]);
   const p = pedidos.at(-1);
   assert.equal(p.path, "/v1/responses");
   assert.equal(p.auth, "Bearer sk-test");

@@ -11,6 +11,7 @@ import {
   hoyChile, getExtras, crearExtras, sacarGalletita, editarGalletita, guardarHoroscopo, horoscopoPara,
 } from "./store.js";
 import { ultimoHoroscopo } from "./horoscopo.js";
+import { tituloSeguro } from "./titulo.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -38,19 +39,20 @@ Reglas:
 - Agrupa temas relacionados solo si se potencian; evita repetir el mismo tema seguido.
 - No cuentes chistes sobre tragedias: si hay una muerte o desgracia, no pongas inmediatamente antes algo burlón del mismo tema.
 - Solo puedes usar los ids entregados. Incluye cada id exactamente una vez.
-- "titulo": el título que se lee en pantalla. Es el título original con la ortografía corregida, nada más.
-  - Solo puedes hacer dos cosas: corregir la ortografía de las palabras (letras y tildes) y poner mayúscula al inicio de la frase y en los nombres propios. Nada más.
-  - No toques la puntuación, los espacios, los emojis ni el resto de las mayúsculas y minúsculas (si algo viene en mayúsculas, queda en mayúsculas).
-  - Usa las mismas palabras, en el mismo orden: no agregues, quites, cambies ni reordenes palabras, y no expandas abreviaciones ni siglas.
+- "titulo": el título que se lee en pantalla. Es el título original EXACTO; lo único que puedes hacer es corregir faltas de ortografía.
+  - Corrige solo palabras mal escritas (letras equivocadas y tildes que faltan o sobran). Nada más.
+  - No toques nada más: ni mayúsculas ni minúsculas (tampoco al inicio ni en nombres propios), ni puntuación, ni espacios, ni emojis.
+  - Usa las mismas palabras, en el mismo orden: no agregues, quites, cambies ni reordenes palabras, no cambies abreviaciones ("q", "xq") ni expandas siglas.
+  - Si el título no tiene faltas, devuélvelo idéntico.
   - Si el original es solo un dominio o una URL, escribe un título neutro y breve basado en eso, sin inventar el contenido.
   - Ejemplos:
-    "perro roba pollo en noticiero en vivo" → "Perro roba pollo en noticiero en vivo"
-    "el gato q abrio el refri" → "El gato q abrió el refri"
-    "bc sube tasa al 6%" → "BC sube tasa al 6%"
-    "temblor en antofagasta deja 2 muertos" → "Temblor en Antofagasta deja 2 muertos"
-    "ULTIMO MINUTO: kast anuncia gabinete" → "ÚLTIMO MINUTO: Kast anuncia gabinete"
-    "increible lo q paso en el metro..." → "Increíble lo q pasó en el metro..."
-    "boric y matthei se cruzan , en debate" → "Boric y Matthei se cruzan , en debate"`;
+    "perro roba pollo en noticiero en vivo" → "perro roba pollo en noticiero en vivo"
+    "el gato q abrio el refri" → "el gato q abrió el refri"
+    "bc sube tasa al 6%" → "bc sube tasa al 6%"
+    "temblor en antofagasta deja 2 muertos" → "temblor en antofagasta deja 2 muertos"
+    "ULTIMO MINUTO: kast anuncia gabinete" → "ULTIMO MINUTO: kast anuncia gabinete"
+    "increible lo q paso en el metro..." → "increíble lo q pasó en el metro..."
+    "ecuentro de lideres en santiago" → "encuentro de líderes en santiago"`;
 
 const SCHEMA = {
   type: "object",
@@ -189,7 +191,7 @@ async function ordenar(items, criterio) {
 async function redactarUltimoMinuto(titular, url) {
   const item = { id: 0, title: titular, url, domain: url ? domainOf(url) : "" };
   const { orden } = await runIA(
-    `Noticia de último minuto para sumar a una pauta ya armada. Va primera: corrige su título con las mismas reglas (solo ortografía y mayúscula al inicio y en nombres propios) y clasifica su tono.\n` +
+    `Noticia de último minuto para sumar a una pauta ya armada. Va primera: corrige solo la ortografía de su título, con las mismas reglas (no toques mayúsculas, puntuación ni palabras) y clasifica su tono.\n` +
       `${item.id}. ${item.title} (${item.domain || "sin link"})`,
   );
   return reconciliar([item], orden)[0];
@@ -243,11 +245,11 @@ function reconciliar(items, orden) {
     const it = byId.get(o.id);
     if (!it || seen.has(o.id)) continue;
     seen.add(o.id);
-    const titulo = typeof o.titulo === "string" ? o.titulo.trim().slice(0, 200) : "";
-    out.push({ ...it, tono: o.tono, titulo: titulo || it.title });
+    // La IA solo corrige ortografía: si cambió palabras, se deshacen (ver titulo.js).
+    out.push({ ...it, tono: o.tono, titulo: tituloSeguro(it.title, o.titulo) });
   }
   for (const it of items) {
-    if (!seen.has(it.id)) out.push({ ...it, tono: "neutro", titulo: it.title });
+    if (!seen.has(it.id)) out.push({ ...it, tono: "neutro", titulo: tituloSeguro(it.title, "") });
   }
   return out;
 }

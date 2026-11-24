@@ -59,14 +59,14 @@ test("último minuto: la IA redacta el titular y la noticia queda primera", asyn
   assert.equal(status, 200);
   assert.equal(data.item.id, 4);
   assert.equal(data.item.title, "temblor fuerte zona central"); // lo que escribió la persona
-  assert.equal(data.item.titulo, "(fake) Título reescrito 0"); // lo que redactó la IA
+  assert.equal(data.item.titulo, "temblor fuerte zona central"); // la IA reescribió todo: se deshace
   assert.ok(["gracioso", "serio", "neutro"].includes(data.item.tono));
   assert.equal(data.item.domain, "emol.com");
   assert.equal(data.item.ultimo, true);
 
   const { data: { pauta } } = await api(`/api/pautas/${p.id}`);
   assert.deepEqual(pauta.items.map((it) => it.id), [4, ...p.items.map((it) => it.id)]);
-  assert.equal(pauta.items[0].titulo, "(fake) Título reescrito 0");
+  assert.equal(pauta.items[0].titulo, "temblor fuerte zona central");
 
   // Se puede mover a mano con el reordenamiento de siempre.
   const order = [...pauta.items.slice(1).map((it) => it.id), 4];
@@ -77,12 +77,12 @@ test("último minuto: la IA redacta el titular y la noticia queda primera", asyn
   // El banner de OBS la muestra (pauta más reciente).
   const { data: ticker } = await api("/api/ticker");
   assert.equal(ticker.id, p.id);
-  assert.ok(ticker.titulares.some((t) => t.texto === "(fake) Título reescrito 0"));
+  assert.ok(ticker.titulares.some((t) => t.texto === "temblor fuerte zona central"));
   assert.equal(ticker.actual, null);
 
   // La última noticia abierta pasa a ser la actual del banner.
   assert.equal((await api(`/api/pautas/${p.id}`, { actual: 4 }, "PUT")).status, 200);
-  assert.equal((await api("/api/ticker")).data.actual.texto, "(fake) Título reescrito 0");
+  assert.equal((await api("/api/ticker")).data.actual.texto, "temblor fuerte zona central");
   assert.equal((await api(`/api/pautas/${p.id}`, { actual: 99 }, "PUT")).status, 400);
   // Si se borra, el banner deja de mostrarla.
   await api(`/api/pautas/${p.id}/items/4`, null, "DELETE");
