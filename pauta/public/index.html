@@ -82,7 +82,7 @@
   .x-horo dl { margin: 10px 0 0; }
   .x-horo dt { font-weight: 700; margin-top: 10px; }
   .x-horo dt span { color: var(--muted); font-weight: 400; font-size: 12px; }
-  .x-horo dd { margin: 2px 0 0; font-size: 14px; }
+  .x-horo dd { margin: 2px 0 0; font-size: 14px; white-space: pre-line; }
   .x-aviso { color: var(--fun); font-size: 13px; margin: 6px 0 0; }
   .x-horo .row { margin-top: 8px; }
 
@@ -1008,7 +1008,7 @@
       }
     } else {
       wrap.innerHTML = `<b>♈ Todavía no hay horóscopo de hoy.</b><p class="status"></p><div class="row"><button class="ghost" type="button">Buscar de nuevo</button></div>`;
-      wrap.querySelector(".status").textContent = extras.errorHoroscopo || "Yolanda Sultana lo publica en primedigital.cl; el servidor lo revisa cada hora.";
+      wrap.querySelector(".status").textContent = extras.errorHoroscopo || "Sale de La Cuarta (si falla, de Yolanda Sultana); el servidor lo revisa cada hora.";
       wrap.querySelector("button").addEventListener("click", buscarHoroscopo);
     }
     box.append(wrap);

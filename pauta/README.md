@@ -124,14 +124,17 @@ with a donation. It offers two buttons:
   splits them into separate cookies, word for word, dropping numbering, formatting, intros and closing lines.
 
 Either way they become today's cookies (1 to 50), and at the same time the server fetches the day's
-horoscope by Yolanda Sultana (published on primedigital.cl). The donations dock in OBS
+horoscope from [La Cuarta](https://www.lacuarta.com/temas/horoscopo/), with Yolanda Sultana
+(published on primedigital.cl) as the backup. The donations dock in OBS
 ([obs-remote](https://github.com/paul0li/obs-remote)) hands them out: each donation gets a random
 cookie that hasn't been given yet (once all are out, they repeat), and the page shows who got which.
 Edit any cookie with ✎; the dock shows the new text from then on.
 
-The site only keeps its latest horoscope (usually published the day before), so the server checks it
-every hour and saves each one by date. If today's never showed up (e.g. a weekend), the closest one
-within 3 days is used and the page says which day it is.
+The server checks every hour and saves each horoscope by date. La Cuarta publishes today's in the early
+morning (around 4:00 in Chile); when La Cuarta fails or doesn't have today's yet, the server also fetches
+Yolanda Sultana's latest (her site only keeps the latest, usually published the day before). Yolanda's
+never replaces a day that already has La Cuarta's, and La Cuarta's always replaces Yolanda's. If today's
+never showed up, the closest one within 3 days is used and the page says which day it is.
 
 ## Configuration
 
@@ -148,7 +151,8 @@ within 3 days is used and the page says which day it is.
 | `HOST` | `0.0.0.0` | Interface to listen on. Use `127.0.0.1` behind a proxy or `tailscale serve`. |
 | `PORT` | `3000` | |
 | `HOROSCOPO` | empty | `no` turns off the hourly horoscope check. |
-| `HOROSCOPO_URL` | empty | Fixed horoscope article URL instead of looking up the latest (for tests). |
+| `HOROSCOPO_LACUARTA_URL` | empty | La Cuarta horoscope index to look in instead of lacuarta.com's (for tests). |
+| `HOROSCOPO_URL` | empty | Fixed Yolanda Sultana article URL instead of looking up the latest (for tests). |
 | `DATA_DIR` | `./data` (next to `server.js`) | Where the history of pautas is saved, one JSON file per pauta. Keep it outside the repo if your deploy runs `git reset --hard`. |
 
 ## API
