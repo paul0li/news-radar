@@ -6,19 +6,26 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import http from "node:http";
-import { articulo } from "./horoscopo-fixture.js";
+import { articulo, laCuarta, portadaLaCuarta, rutaLaCuarta } from "./horoscopo-fixture.js";
 
 // Levanta el server de verdad con el Claude falso (test/fake-claude.js) y un DATA_DIR temporal.
-// El horóscopo sale de un servidor local con un artículo de prueba con la fecha de hoy.
+// El horóscopo sale de un servidor local: la portada y el artículo de hoy de La Cuarta en /lacuarta/…,
+// y el de Yolanda Sultana en /yolanda/ (respaldo).
 let dir, server, base, sitio;
 const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(new Date());
 before(async () => {
   dir = await mkdtemp(join(tmpdir(), "pauta-server-test-"));
-  sitio = http.createServer((req, res) => res.end(articulo(hoy))).listen(0, "127.0.0.1");
+  sitio = http.createServer((req, res) => {
+    if (req.url === "/lacuarta/") return res.end(portadaLaCuarta([hoy]));
+    if (req.url === rutaLaCuarta(hoy)) return res.end(laCuarta(hoy));
+    if (req.url === "/yolanda/") return res.end(articulo(hoy));
+    res.statusCode = 404;
+    res.end();
+  }).listen(0, "127.0.0.1");
   await new Promise((r) => sitio.once("listening", r));
   server = spawn(process.execPath, ["server.js"], {
     cwd: fileURLToPath(new URL("..", import.meta.url)),
-    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", DATA_DIR: dir, APP_PASSWORD: "", OPENAI_API_KEY: "", CLAUDE_BIN: "./test/fake-claude.js", FAKE_DELAY_MS: "0", HOROSCOPO_URL: `http://127.0.0.1:${sitio.address().port}/` },
+    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", DATA_DIR: dir, APP_PASSWORD: "", OPENAI_API_KEY: "", CLAUDE_BIN: "./test/fake-claude.js", FAKE_DELAY_MS: "0", HOROSCOPO_LACUARTA_URL: `http://127.0.0.1:${sitio.address().port}/lacuarta/`, HOROSCOPO_URL: `http://127.0.0.1:${sitio.address().port}/yolanda/` },
     stdio: ["ignore", "pipe", "inherit"],
   });
   base = await new Promise((resolve, reject) => {
@@ -152,6 +159,7 @@ test("galletitas y horóscopo del día", async () => {
   assert.equal(data.galletitas.length, 15);
   assert.equal(data.galletitas[0].texto, "(fake) Galletita 1: Hágame 15 frases sobre el frío");
   assert.equal(data.horoscopo.fecha, hoy);
+  assert.equal(data.horoscopo.fuente, "La Cuarta");
   assert.equal(data.horoscopo.signos.length, 12);
   assert.equal(data.errorHoroscopo, null);
 

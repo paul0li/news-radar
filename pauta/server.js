@@ -8,9 +8,9 @@ import { resolve } from "node:path";
 import { parseLinks, domainOf } from "./parse.js";
 import {
   createPauta, getPauta, listPautas, updatePauta, deletePauta, addItem, editItem, removeItem,
-  hoyChile, getExtras, crearExtras, sacarGalletita, editarGalletita, guardarHoroscopo, horoscopoPara,
+  hoyChile, getExtras, crearExtras, sacarGalletita, editarGalletita, guardarHoroscopo, getHoroscopo, horoscopoPara,
 } from "./store.js";
-import { ultimoHoroscopo } from "./horoscopo.js";
+import { actualizarHoroscopos } from "./horoscopo.js";
 import { tituloSeguro } from "./titulo.js";
 
 const PORT = Number(process.env.PORT || 3000);
@@ -211,11 +211,11 @@ async function galletitasDe(texto, { generar }) {
   return limpias.map((g) => g.slice(0, 300));
 }
 
-// Trae el último horóscopo publicado y lo guarda con su fecha. Devuelve el error como texto, sin lanzarlo.
+// Trae el horóscopo (La Cuarta, o Yolanda Sultana de respaldo) y lo guarda con su fecha.
+// Devuelve el error como texto, sin lanzarlo.
 async function actualizarHoroscopo() {
   try {
-    await guardarHoroscopo(await ultimoHoroscopo());
-    return null;
+    return await actualizarHoroscopos({ guardar: guardarHoroscopo, delDia: getHoroscopo });
   } catch (err) {
     console.warn("Horóscopo:", err.message);
     return err.message;

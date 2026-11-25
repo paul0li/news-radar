@@ -19,3 +19,35 @@ export function articulo(fecha, { sin } = {}) {
 <h1 class="elementor-heading-title">Horóscopo Lunes ${d} de ${MESES[m - 1]} ${y}</h1>
 <div>${cuerpo}<p class="wp-block-paragraph"><strong>Contacto</strong> Yolanda Sultana, Astróloga</p></div></body></html>`;
 }
+
+// Artículo y portada con la misma forma que los de lacuarta.com (textos inventados).
+const NOMBRES = ["Aries", "Tauro", "Géminis", "Cáncer", "Leo", "Virgo", "Libra", "Escorpio", "Sagitario", "Capricornio", "Acuario", "Piscis"];
+const DIAS = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
+const AVISO = `<div class="ads-block show"><div class="ads-block__container"><div style="height:250"></div></div></div>`;
+
+const slug = (fecha) => {
+  const [y, m, d] = fecha.split("-").map(Number);
+  const dia = DIAS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  return `horoscopo-hoy-${dia}-${d}-de-${MESES[m - 1].toLowerCase()}-revisa-como-estara-el-amor-dinero-y-salud-para-tu-signo-zodiacal`;
+};
+
+// fecha → HTML del artículo de ese día. `sin` deja fuera un signo.
+export function laCuarta(fecha, { sin } = {}) {
+  const [, m, d] = fecha.split("-").map(Number);
+  const cuerpo = NOMBRES.filter((n) => n !== sin).map((n, i) =>
+    `<h3 class="article-body__heading-h3">${n}</h3><p class="article-body__paragraph">General de ${n} &#8211; día ${d}.</p>${i % 2 ? AVISO : ""}` +
+    `<p class="article-body__paragraph">Dinero de ${n}.</p><p class="article-body__paragraph">Amor de ${n}.</p>`,
+  ).join("");
+  return `<html><head><script type="application/ld+json">{"@type":"NewsArticle","datePublished":"${fecha}T07:00:00Z"}</script></head><body>
+<h1 class="article-head__title">Horóscopo hoy, ${slug(fecha).split("-")[2]} ${d} de ${MESES[m - 1].toLowerCase()}: revisa cómo estará el amor, dinero y salud para tu signo zodiacal</h1>
+<div class="article-body"><p class="article-body__paragraph">Introducción del día.</p>${cuerpo}</div>
+<section class="article-body__tags"><a href="/temas/horoscopo/">Horóscopo</a></section>
+<div><h2>Imperdibles</h2><h3>Leo</h3><p>Una nota que no es del horóscopo.</p></div></body></html>`;
+}
+
+// Portada con links a esas fechas, en ese orden (la primera es la más nueva).
+export function portadaLaCuarta(fechas) {
+  return `<html><body><h1>Horóscopo</h1>${fechas.map((f) => `<a href="/servicios/noticia/${slug(f)}/">${f}</a>`.repeat(3)).join("\n")}</body></html>`;
+}
+
+export const rutaLaCuarta = (fecha) => `/servicios/noticia/${slug(fecha)}/`;

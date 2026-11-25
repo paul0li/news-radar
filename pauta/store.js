@@ -274,6 +274,8 @@ export function editarGalletita(fecha, id, { texto } = {}) {
 }
 
 export const guardarHoroscopo = (h) => escribir(archivoDia("horoscopo", h.fecha), h);
+// El guardado justo de ese día, o null.
+export const getHoroscopo = (fecha) => leer(archivoDia("horoscopo", fecha));
 
 // El horóscopo de ese día; si no hay (p. ej. no salió el fin de semana), el más cercano guardado
 // dentro de 3 días, prefiriendo uno anterior. null si no hay ninguno.
